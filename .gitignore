@@ -103,6 +103,7 @@ tags
 
 # vs
 .vs
+.vscode
 
 tavern.lock
 pytype_output
