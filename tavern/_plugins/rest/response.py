@@ -33,7 +33,8 @@ class RestResponse(BaseResponse):
         body = expected.get("body") or {}
 
         if "$ext" in body:
-            self.validate_function = get_wrapped_response_function(body["$ext"])
+            self.validate_function = get_wrapped_response_function(
+                body["$ext"])
         else:
             self.validate_function = None
 
@@ -89,7 +90,8 @@ class RestResponse(BaseResponse):
             parsed_url = urlparse(response.headers["location"])
             to_path = "{0}://{1}{2}".format(*parsed_url)
             logger.debug("Redirect location: %s", to_path)
-            log_dict_block(redirect_query_params, "Redirect URL query parameters")
+            log_dict_block(redirect_query_params,
+                           "Redirect URL query parameters")
 
     def _get_redirect_query_params(self, response):
         """If there was a redirect header, get any query parameters from it
@@ -100,12 +102,12 @@ class RestResponse(BaseResponse):
         except KeyError as e:
             if "redirect_query_params" in self.expected.get("save", {}):
                 self._adderr("Wanted to save %s, but there was no redirect url in response",
-                    self.expected["save"]["redirect_query_params"], e=e)
+                             self.expected["save"]["redirect_query_params"], e=e)
             redirect_query_params = {}
         else:
             parsed = urlparse(redirect_url)
             qp = parsed.query
-            redirect_query_params = {i:j[0] for i, j in parse_qs(qp).items()}
+            redirect_query_params = {i: j[0] for i, j in parse_qs(qp).items()}
 
         return redirect_query_params
 
@@ -113,8 +115,9 @@ class RestResponse(BaseResponse):
         expected_code = self.expected["status_code"]
 
         if (isinstance(expected_code, int) and status_code == expected_code) or \
-        (isinstance(expected_code, list) and (status_code in expected_code)):
-            logger.debug("Status code '%s' matched expected '%s'", status_code, expected_code)
+                (isinstance(expected_code, list) and (status_code in expected_code)):
+            logger.debug("Status code '%s' matched expected '%s'",
+                         status_code, expected_code)
             return
         else:
             if 400 <= status_code < 500:
@@ -122,12 +125,12 @@ class RestResponse(BaseResponse):
                 # response would contain some kind of information as to why this
                 # request was rejected.
                 self._adderr("Status code was %s, expected %s:\n%s",
-                    status_code, expected_code,
-                    indent_err_text(json.dumps(body)),
-                    )
+                             status_code, expected_code,
+                             indent_err_text(json.dumps(body)),
+                             )
             else:
                 self._adderr("Status code was %s, expected %s",
-                    status_code, expected_code)
+                             status_code, expected_code)
 
     def verify(self, response):
         """Verify response against expected values and returns any values that
@@ -162,49 +165,58 @@ class RestResponse(BaseResponse):
         if self.validate_function:
             try:
                 self.validate_function(response)
-            except Exception as e: #pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-except
                 self._adderr("Error calling validate function '%s':\n%s",
-                    self.validate_function.func,
-                    indent_err_text(traceback.format_exc()),
-                    e=e)
+                             self.validate_function.func,
+                             indent_err_text(traceback.format_exc()),
+                             e=e)
 
         # Get any keys to save
         saved = {}
 
         redirect_query_params = self._get_redirect_query_params(response)
 
+        if "variables" in self.test_block_config and "tavern" in self.test_block_config["variables"]:
+            tavern_box = self.test_block_config["variables"]["tavern"]
+            request = tavern_box.request_vars
+            saved.update(self._save_value("request", request))
+
         saved.update(self._save_value("body", body))
         saved.update(self._save_value("headers", response.headers))
-        saved.update(self._save_value("redirect_query_params", redirect_query_params))
+        saved.update(self._save_value(
+            "redirect_query_params", redirect_query_params))
 
         for cookie in self.expected.get("cookies", []):
             if cookie not in response.cookies:
                 self._adderr("No cookie named '%s' in response", cookie)
 
         try:
-            wrapped = get_wrapped_response_function(self.expected["save"]["$ext"])
+            wrapped = get_wrapped_response_function(
+                self.expected["save"]["$ext"])
         except KeyError:
             logger.debug("No save function for this stage")
         else:
             try:
                 to_save = wrapped(response)
-            except Exception as e: #pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-except
                 self._adderr("Error calling save function '%s':\n%s",
-                    wrapped.func,
-                    indent_err_text(traceback.format_exc()),
-                    e=e)
+                             wrapped.func,
+                             indent_err_text(traceback.format_exc()),
+                             e=e)
             else:
                 if isinstance(to_save, dict):
                     saved.update(to_save)
                 elif to_save is not None:
-                    self._adderr("Unexpected return value '%s' from $ext save function")
+                    self._adderr(
+                        "Unexpected return value '%s' from $ext save function")
 
         self._validate_block("body", body)
         self._validate_block("headers", response.headers)
         self._validate_block("redirect_query_params", redirect_query_params)
 
         if self.errors:
-            raise TestFailError("Test '{:s}' failed:\n{:s}".format(self.name, self._str_errors()), failures=self.errors)
+            raise TestFailError("Test '{:s}' failed:\n{:s}".format(
+                self.name, self._str_errors()), failures=self.errors)
 
         return saved
 
@@ -238,7 +250,8 @@ class RestResponse(BaseResponse):
             block = {i.lower(): j for i, j in block.items()}
             expected_block = {i.lower(): j for i, j in expected_block.items()}
 
-        logger.debug("Validating response %s against %s", blockname, expected_block)
+        logger.debug("Validating response %s against %s",
+                     blockname, expected_block)
 
         # 'strict' could be a list, in which case we only want to enable strict
         # key checking for that specific bit of the response
@@ -248,7 +261,8 @@ class RestResponse(BaseResponse):
         else:
             block_strictness = test_strictness
 
-        self.recurse_check_key_match(expected_block, block, blockname, block_strictness)
+        self.recurse_check_key_match(
+            expected_block, block, blockname, block_strictness)
 
     def _save_value(self, key, to_check):
         """Save a value in the response for use in future tests
@@ -273,15 +287,16 @@ class RestResponse(BaseResponse):
 
         if not to_check:
             self._adderr("No %s in response (wanted to save %s)",
-                key, expected)
+                         key, expected)
         else:
             for save_as, joined_key in expected.items():
                 split_key = joined_key.split(".")
                 try:
-                    saved[save_as] = recurse_access_key(to_check, copy.copy(split_key))
+                    saved[save_as] = recurse_access_key(
+                        to_check, copy.copy(split_key))
                 except (IndexError, KeyError) as e:
                     self._adderr("Wanted to save '%s' from '%s', but it did not exist in the response",
-                        joined_key, key, e=e)
+                                 joined_key, key, e=e)
 
         if saved:
             logger.debug("Saved %s for '%s' from response", saved, key)

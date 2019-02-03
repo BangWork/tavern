@@ -21,8 +21,8 @@ def fix_example_includes():
         },
         "strict": True,
         "stages": [{
-            "name": "my_external_stage",
-            "description": "My external stage",
+            "id": "my_external_stage",
+            "name": "My external stage",
             "request": {
                 "url": "http://www.bing.com",
                 "method": "GET",

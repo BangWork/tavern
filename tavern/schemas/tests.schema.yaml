@@ -29,11 +29,14 @@ schema;stage:
   type: map
   required: true
   mapping:
+    id:
+      type: str
+      required: false
+      unique: true
     name:
       type: str
       required: true
-      unique: true
-    descrption:
+    description:
       type: str
       required: false
     max_retries:
@@ -208,7 +211,9 @@ mapping:
   name:
     required: true
     type: str
-
+  description:
+    required: false
+    type: str
   marks:
     type: seq
     matching: "any"

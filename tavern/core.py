@@ -10,6 +10,7 @@ from contextlib2 import ExitStack
 from box import Box
 
 from .util import exceptions
+from .util.dict_util import format_keys
 from .util.delay import delay
 from .util.retry import retry
 
@@ -20,37 +21,46 @@ from .schemas.files import wrapfile
 logger = logging.getLogger(__name__)
 
 
-def _resolve_test_stages(test_spec, variables):
+def _resolve_reference_stage(raw_stage, available_stages):
+    if "ref" in raw_stage:
+        ref_id = raw_stage["ref"]
+        if ref_id in available_stages:
+            ref_stage = available_stages[ref_id]
+            # make a copy of ref stage, which can not change the origin one
+            copy_stage = deepcopy(ref_stage)
+            copy_stage.update(raw_stage)
+            logger.debug("found stage reference: %s", ref_id)
+            return copy_stage
+        else:
+            logger.error(
+                "Bad stage: unknown stage referenced: %s", ref_id)
+            raise exceptions.InvalidStageReferenceError(
+                "Unknown stage reference: {}".format(ref_id))
+    else:
+        return raw_stage
+
+
+def _resolve_test_stages(test_spec, variables, parse_stages=True):
     # Need to get a final list of stages in the tests (resolving refs)
     final_stages = {}
     # resolve stage in includes first
+
     if "includes" in test_spec:
         for included in test_spec["includes"]:
             includedStages = _resolve_test_stages(included, variables)
             final_stages.update(includedStages)
 
     if "variables" in test_spec:
-        variables.update(test_spec["variables"])
-    if "stages" in test_spec:
-        new_stages = {}
+        formatted_include = format_keys(test_spec["variables"], variables)
+        variables.update(formatted_include)
+
+    if parse_stages and "stages" in test_spec:
         for raw_stage in test_spec["stages"]:
-            if "ref" in raw_stage:
-                ref_id = raw_stage["ref"]
-                if ref_id in final_stages:
-                    ref_stage = final_stages[ref_id]
-                    # make a copy of ref stage, which can not change the origin one
-                    copy_stage = deepcopy(ref_stage)
-                    copy_stage.update(raw_stage)
-                    new_stages[raw_stage["name"]] = copy_stage
-                    logger.debug("found stage reference: %s", ref_id)
-                else:
-                    logger.error(
-                        "Bad stage: unknown stage referenced: %s", ref_id)
-                    raise exceptions.InvalidStageReferenceError(
-                        "Unknown stage reference: {}".format(ref_id))
-            else:
-                new_stages[raw_stage["name"]] = raw_stage
-        final_stages.update(new_stages)
+            if "id" not in raw_stage:
+                continue
+            new_stage = _resolve_reference_stage(raw_stage, final_stages)
+            final_stages[raw_stage["id"]] = new_stage
+
     return final_stages
 
 
@@ -98,15 +108,15 @@ def run_test(in_file, test_spec, global_cfg):
     default_strictness = test_block_config["strict"]
 
     logger.info("Running test : %s", test_block_name)
-
+    logger.debug("variables:%s", json.dumps(test_block_config))
     with ExitStack() as stack:
         final_stages = _resolve_test_stages(
-            test_spec, test_block_config["variables"])
-        stages = test_spec["stages"]
-        for index, stage in enumerate(stages):
-            logger.debug("index:%d,stage name:%s", index, stage["name"])
-            if stage["name"] in final_stages:
-                stages[index] = final_stages[stage["name"]]
+            test_spec, test_block_config["variables"], False)
+
+        for stage in test_spec["stages"]:
+            if "ref" in stage:
+                new_stage = _resolve_reference_stage(stage, final_stages)
+                stage.update(new_stage)
 
         sessions = get_extra_sessions(test_spec, test_block_config)
 

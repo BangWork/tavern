@@ -9,6 +9,7 @@ from tavern.schemas.extensions import validate_extensions
 from tavern.util import exceptions
 from tavern.util.loader import ANYTHING, IncludeLoader
 from tavern.util.dict_util import deep_dict_merge, check_keys_match_recursive, format_keys
+from tavern.util.comparators import deep_equal
 
 
 class TestValidateFunctions:
@@ -251,7 +252,6 @@ class TestMatchRecursive:
             check_keys_match_recursive(a, b, [])
 
 
-
 @pytest.fixture(name="test_yaml")
 def fix_test_yaml():
     text = dedent("""
@@ -288,9 +288,12 @@ class TestCustomTokens:
         stages = yaml.load(test_yaml, Loader=IncludeLoader)['stages'][0]
 
         self.assert_type_value(stages['request']['json']['number'], int, 5)
-        self.assert_type_value(stages['response']['body']['double'], float, 10.0)
-        self.assert_type_value(stages['request']['json']['return_float'], bool, True)
-        self.assert_type_value(stages['request']['json']['is_sensitive'], bool, False)
+        self.assert_type_value(
+            stages['response']['body']['double'], float, 10.0)
+        self.assert_type_value(
+            stages['request']['json']['return_float'], bool, True)
+        self.assert_type_value(
+            stages['request']['json']['is_sensitive'], bool, False)
         self.assert_type_value(
             stages['request']['json']['raw_str'],
             str,
@@ -320,3 +323,10 @@ class TestFormatKeys:
         }
 
         assert format_keys(to_format, format_variables)["a"] == final_value
+
+
+class TestComparators:
+    def test_deep_diff(self):
+        a1 = {"a": 1}
+        a2 = {"a": 2}
+        deep_equal(a1, a2)

@@ -120,9 +120,9 @@ class TestRunStages:
         mock_response = Mock(**mockargs)
 
         newtest = deepcopy(fulltest)
-        newtest["includes"] = [includes]
+        newtest["includes"] = [deepcopy(includes)]
         newtest["stages"].insert(
-            0, {"name": "test_external_stage", "ref": "my_external_stage"})
+            0, {"ref": "my_external_stage"})
         with patch("tavern._plugins.rest.request.requests.Session.request", return_value=mock_response) as pmock:
             run_test("heif", newtest, includes)
 
@@ -308,8 +308,8 @@ class TestFormatMQTTVarsJson:
             },
             "stages": [
                 {
-                    "name": "test",
-                    "description": "step 1",
+                    "id": "test",
+                    "name": "step 1",
                     "mqtt_publish": {
                         "topic": "/abc/123",
                         "json": {
@@ -368,8 +368,8 @@ class TestFormatMQTTVarsPlain:
             },
             "stages": [
                 {
-                    "name": "test",
-                    "description": "step 1",
+                    "id": "test",
+                    "name": "step 1",
                     "mqtt_publish": {
                         "topic": "/abc/123",
                         "payload": "hello",
