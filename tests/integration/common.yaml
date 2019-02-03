@@ -15,8 +15,8 @@ variables:
 
 
 stages:
-  - id: typetoken-anything-match
-    name: match top level
+  - name: typetoken-anything-match
+    description: match top level
     request:
       url: "{host}/fake_dictionary"
       method: GET

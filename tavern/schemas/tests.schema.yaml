@@ -29,13 +29,13 @@ schema;stage:
   type: map
   required: true
   mapping:
-    id:
-      type: str
-      required: false
     name:
       type: str
       required: true
       unique: true
+    descrption:
+      type: str
+      required: false
     max_retries:
       type: int
       required: false
@@ -199,17 +199,13 @@ schema;stage_ref:
   type: map
   required: true
   mapping:
-    type:
-      required: true
-      type: str
-      pattern: ^ref$
-    id:
+    ref:
       required: true
       type: str
 
 type: map
 mapping:
-  test_name:
+  name:
     required: true
     type: str
 

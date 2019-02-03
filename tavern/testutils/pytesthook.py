@@ -25,7 +25,7 @@ from tavern.util.loader import IncludeLoader
 
 logger = logging.getLogger(__name__)
 
-match_tavern_file = re.compile(r'.+\.tavern\.ya?ml$').match
+match_tavern_file = re.compile(r'^stage_.+\.ya?ml$|^stage_.+\.json$').match
 
 
 def pytest_collect_file(parent, path):
@@ -35,7 +35,7 @@ def pytest_collect_file(parent, path):
     Todo:
         Change this to .tyaml or something?
     """
-    if path.basename.startswith("test") and match_tavern_file(path.strpath):
+    if match_tavern_file(path.basename):
         return YamlFile(path, parent)
 
     return None
@@ -110,6 +110,20 @@ def pytest_addoption(parser):
         type="bool",
         default=False,
     )
+
+
+# @pytest.mark.hookwrapper
+# def pytest_runtest_makereport(item):
+    # # ??? 什么鬼？
+    # outcome = yield
+    # report = outcome.get_result()
+    # # 没做插件怎么办？
+    # pytest_html = item.config.pluginmanager.getplugin('html')
+    # if pytest_html is not None:
+    #     extra = getattr(report, 'extra', [])
+    #     if report.when == 'call':
+    #         extra.append(pytest_html.extras.json(item.result, "summay"))
+    #         report.extra = extra
 
 
 class YamlFile(pytest.File):
@@ -187,9 +201,10 @@ class YamlFile(pytest.File):
             # Change the name
             inner_formatted = inner_fmt.format(*flattened_values)
             spec_new = copy.deepcopy(test_spec)
-            spec_new["test_name"] = test_spec["test_name"] + "[{}]".format(inner_formatted)
+            spec_new["name"] = test_spec["name"] + \
+                "[{}]".format(inner_formatted)
 
-            logger.debug("New test name: %s", spec_new["test_name"])
+            logger.debug("New test name: %s", spec_new["name"])
 
             # Make this new thing available for formatting
             spec_new.setdefault("includes", []).append({
@@ -198,14 +213,15 @@ class YamlFile(pytest.File):
                 "variables": variables
             })
             # And create the new item
-            item_new = YamlItem(spec_new["test_name"], self, spec_new, self.fspath)
+            item_new = YamlItem(
+                spec_new["name"], self, spec_new, self.fspath)
             item_new.add_markers(pytest_marks)
 
             yield item_new
 
     def _generate_items(self, test_spec):
 
-        item = YamlItem(test_spec["test_name"], self, test_spec, self.fspath)
+        item = YamlItem(test_spec["name"], self, test_spec, self.fspath)
 
         marks = test_spec.get("marks", [])
 
@@ -232,12 +248,14 @@ class YamlFile(pytest.File):
                         # cannot do 'skipif' and rely on a parametrized
                         # argument.
                         extra_arg = format_keys(extra_arg, fmt_vars)
-                        pytest_marks.append(getattr(pytest.mark, markname)(extra_arg))
+                        pytest_marks.append(
+                            getattr(pytest.mark, markname)(extra_arg))
 
             # Do this after we've added all the other marks so doing
             # things like selecting on mark names still works even
             # after parametrization
-            parametrize_marks = [i for i in marks if isinstance(i, dict) and "parametrize" in i]
+            parametrize_marks = [i for i in marks if isinstance(
+                i, dict) and "parametrize" in i]
             if parametrize_marks:
                 # no 'yield from' in python 2...
                 for new_item in self.get_parametrized_items(
@@ -263,13 +281,15 @@ class YamlFile(pytest.File):
 
         try:
             # Convert to a list so we can catch parser exceptions
-            all_tests = list(yaml.load_all(self.fspath.open(encoding="utf-8"), Loader=IncludeLoader))
+            all_tests = list(yaml.load_all(self.fspath.open(
+                encoding="utf-8"), Loader=IncludeLoader))
         except yaml.parser.ParserError as e:
             raise_from(exceptions.BadSchemaError, e)
 
         for test_spec in all_tests:
             if not test_spec:
-                logger.warning("Empty document in input file '%s'", self.fspath)
+                logger.warning(
+                    "Empty document in input file '%s'", self.fspath)
                 continue
 
             try:
@@ -321,8 +341,6 @@ class YamlItem(pytest.Item):
             name = "<unknown>"
             if "name" in stage:
                 name = stage["name"]
-            elif "id" in stage:
-                name = stage["id"]
             stages.append("{:d}: {:s}".format(i + 1, name))
 
         # This needs to be a function or skipif breaks
@@ -347,7 +365,7 @@ class YamlItem(pytest.Item):
                     # deal with). Instead just don't add the marker and it will
                     # raise an exception at test verification.
                     logger.error("'usefixtures' was an invalid type (should"
-                        " be a list of fixture names)")
+                                 " be a list of fixture names)")
                     continue
 
             self.add_marker(pm)
@@ -356,7 +374,8 @@ class YamlItem(pytest.Item):
         # Load ini first
         ini_global_cfg_paths = self.config.getini("tavern-global-cfg") or []
         # THEN load command line, to allow overwriting of values
-        cmdline_global_cfg_paths = self.config.getoption("tavern_global_cfg") or []
+        cmdline_global_cfg_paths = self.config.getoption(
+            "tavern_global_cfg") or []
 
         all_paths = ini_global_cfg_paths + cmdline_global_cfg_paths
         global_cfg = load_global_config(all_paths)
@@ -378,7 +397,8 @@ class YamlItem(pytest.Item):
             strict = self.config.getini("tavern-strict")
             if isinstance(strict, list):
                 if any(i not in ["body", "headers", "redirect_query_params"] for i in strict):
-                    raise exceptions.UnexpectedKeysError("Invalid values for 'strict' use in config file")
+                    raise exceptions.UnexpectedKeysError(
+                        "Invalid values for 'strict' use in config file")
         elif self.config.getoption("tavern_strict") is not None:
             strict = self.config.getoption("tavern_strict")
         else:
@@ -416,9 +436,9 @@ class YamlItem(pytest.Item):
                 mark_values = {m.args: self.funcargs[m.args]}
             else:
                 raise exceptions.BadSchemaError(("Can't handle 'usefixtures' spec of '{}'."
-                    " There appears to be a bug in pykwalify so verification of"
-                    " 'usefixtures' is broken - it should be a list of fixture"
-                    " names").format(m.args))
+                                                 " There appears to be a bug in pykwalify so verification of"
+                                                 " 'usefixtures' is broken - it should be a list of fixture"
+                                                 " names").format(m.args))
 
             if any(mv in values for mv in mark_values):
                 logger.warning("Overriding value for %s", mark_values)
@@ -460,9 +480,10 @@ class YamlItem(pytest.Item):
         else:
             if xfail:
                 logger.error("Expected test to fail")
-                raise exceptions.TestFailError("Expected test to fail at {} stage".format(xfail))
+                raise exceptions.TestFailError(
+                    "Expected test to fail at {} stage".format(xfail))
 
-    def repr_failure(self, excinfo): # pylint: disable=no-self-use
+    def repr_failure(self, excinfo):  # pylint: disable=no-self-use
         """ called when self.runtest() raises an exception.
 
         Todo:
@@ -500,7 +521,8 @@ class ReprdError(object):
             # pylint: disable=protected-access
             keys = self.exce._excinfo[1].test_block_config["variables"]
         except AttributeError:
-            logger.warning("Unable to read stage variables - error output may be wrong")
+            logger.warning(
+                "Unable to read stage variables - error output may be wrong")
             keys = self.item.global_cfg
 
         return keys
@@ -557,7 +579,7 @@ class ReprdError(object):
 
         return missing
 
-    def _print_test_stage(self, tw, code_lines, missing_format_vars, line_start): # pylint: disable=no-self-use
+    def _print_test_stage(self, tw, code_lines, missing_format_vars, line_start):  # pylint: disable=no-self-use
         """Print the direct source lines from this test stage
 
         If we couldn't get the stage for some reason, print the entire test out.
@@ -573,7 +595,8 @@ class ReprdError(object):
             line_start (int): Source line of this stage
         """
         if line_start:
-            tw.line("Source test stage (line {}):".format(line_start), white=True, bold=True)
+            tw.line("Source test stage (line {}):".format(
+                line_start), white=True, bold=True)
         else:
             tw.line("Source test stages:", white=True, bold=True)
 
@@ -583,7 +606,7 @@ class ReprdError(object):
             else:
                 tw.line(line, white=True)
 
-    def _print_formatted_stage(self, tw, stage): # pylint: disable=no-self-use
+    def _print_formatted_stage(self, tw, stage):  # pylint: disable=no-self-use
         """Print the 'formatted' stage that Tavern will actually use to send the
         request/process the response
 
@@ -594,7 +617,8 @@ class ReprdError(object):
         tw.line("Formatted stage:", white=True, bold=True)
 
         # This will definitely exist
-        formatted_lines = yaml.dump(stage, default_flow_style=False).split("\n")
+        formatted_lines = yaml.dump(
+            stage, default_flow_style=False).split("\n")
 
         keys = self._get_available_format_keys()
 
@@ -667,7 +691,7 @@ class ReprdError(object):
 
     @property
     def longreprtext(self):
-        tw = py.io.TerminalWriter(stringio=True)  #pylint: disable=no-member
+        tw = py.io.TerminalWriter(stringio=True)  # pylint: disable=no-member
         tw.hasmarkup = False
         self.toterminal(tw)
         exc = tw.stringio.getvalue()

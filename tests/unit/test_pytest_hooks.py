@@ -76,7 +76,7 @@ def get_parametrised_tests(marks):
     y = YamlFile(**mock_args())
 
     spec = {
-        "test_name": "a test"
+        "name": "a test"
     }
 
     gen = y.get_parametrized_items(spec, marks, [])

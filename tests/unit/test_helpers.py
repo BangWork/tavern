@@ -17,6 +17,7 @@ class FakeResponse:
         self.text = text
         self.headers = dict(test_header=text)
 
+
 class TestRegex:
 
     def test_regex_match(self):
@@ -35,7 +36,8 @@ class TestRegex:
     def test_regex_match_header(self):
         response = FakeResponse("abchelloabc")
 
-        matched = validate_regex(response, "(?P<greeting>hello)", 'test_header')
+        matched = validate_regex(
+            response, "(?P<greeting>hello)", 'test_header')
 
         assert "greeting" in matched["regex"]
 
@@ -146,7 +148,6 @@ class TestTavernRepr:
         assert rmock.called
 
 
-
 @pytest.fixture(name='nested_response')
 def fix_nested_response():
     class response_content(object):
@@ -177,7 +178,8 @@ class TestContent:
         comparisons = [
             {'jmespath': "top.Thing", 'operator': "eq", 'expected': "value"},
             {'jmespath': "an_integer", 'operator': "eq", 'expected': 123},
-            {'jmespath': "top.nested.doubly.inner_list", 'operator': "type", 'expected': "list"},
+            {'jmespath': "top.nested.doubly.inner_list",
+                'operator': "type", 'expected': "list"},
         ]
         validate_content(nested_response, comparisons)
         assert True

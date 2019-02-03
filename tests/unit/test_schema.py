@@ -11,7 +11,7 @@ from tavern.schemas.files import verify_tests
 def fix_test_dict():
     text = dedent("""
     ---
-    test_name: Make sure server doubles number properly
+    name: Make sure server doubles number properly
 
     stages:
       - name: Make sure number is returned correctly

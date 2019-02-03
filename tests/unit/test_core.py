@@ -16,10 +16,11 @@ from tavern.util import exceptions
 @pytest.fixture(name="fulltest")
 def fix_example_test():
     spec = {
-        "test_name": "A test with a single stage",
+        "name": "A test with a single stage",
         "stages": [
             {
-                "name": "step 1",
+                "name": "test",
+                "description": "step 1",
                 "request": {
                     "url": "http://www.google.com",
                     "method": "GET",
@@ -101,7 +102,8 @@ class TestRunStages:
         """Wrong headers
         """
 
-        mockargs["headers"] = {"content-type": "application/x-www-url-formencoded"}
+        mockargs["headers"] = {
+            "content-type": "application/x-www-url-formencoded"}
 
         mock_response = Mock(**mockargs)
 
@@ -119,7 +121,8 @@ class TestRunStages:
 
         newtest = deepcopy(fulltest)
         newtest["includes"] = [includes]
-        newtest["stages"].insert(0, {"type": "ref", "id": "my_external_stage"})
+        newtest["stages"].insert(
+            0, {"name": "test_external_stage", "ref": "my_external_stage"})
         with patch("tavern._plugins.rest.request.requests.Session.request", return_value=mock_response) as pmock:
             run_test("heif", newtest, includes)
 
@@ -210,7 +213,8 @@ class TestTavernMetaFormat:
 
         env_key = "SPECIAL_CI_MAGIC_COMMIT_TAG"
 
-        fulltest["stages"][0]["request"]["params"] = {"a_format_key": "{tavern.env_vars.%s}" % env_key}
+        fulltest["stages"][0]["request"]["params"] = {
+            "a_format_key": "{tavern.env_vars.%s}" % env_key}
 
         mock_response = Mock(**mockargs)
 
@@ -225,7 +229,8 @@ class TestTavernMetaFormat:
 
         env_key = "SPECIAL_CI_MAGIC_COMMIT_TAG"
 
-        fulltest["stages"][0]["request"]["params"] = {"a_format_key": "{tavern.env_vars.%s}" % env_key}
+        fulltest["stages"][0]["request"]["params"] = {
+            "a_format_key": "{tavern.env_vars.%s}" % env_key}
 
         with pytest.raises(exceptions.MissingFormatError):
             run_test("heif", fulltest, includes)
@@ -244,7 +249,8 @@ class TestFormatRequestVars:
         sent_value = str(uuid.uuid4())
 
         fulltest["stages"][0]["request"]["method"] = "POST"
-        fulltest["stages"][0]["request"][request_key] = {"a_format_key": sent_value}
+        fulltest["stages"][0]["request"][request_key] = {
+            "a_format_key": sent_value}
 
         if request_key == "json":
             resp_key = "body"
@@ -253,7 +259,8 @@ class TestFormatRequestVars:
             resp_key = request_key
             mockargs[request_key] = {"returned": sent_value}
 
-        fulltest["stages"][0]["response"][resp_key] = {"returned": "{tavern.request_vars.%s.a_format_key:s}" % request_key}
+        fulltest["stages"][0]["response"][resp_key] = {
+            "returned": "{tavern.request_vars.%s.a_format_key:s}" % request_key}
 
         mock_response = Mock(**mockargs)
 
@@ -277,7 +284,8 @@ class TestFormatRequestVars:
         resp_key = request_key
         mockargs[request_key] = {"returned": sent_value}
 
-        fulltest["stages"][0]["response"][resp_key] = {"returned": "{tavern.request_vars.%s:s}" % request_key}
+        fulltest["stages"][0]["response"][resp_key] = {
+            "returned": "{tavern.request_vars.%s:s}" % request_key}
 
         mock_response = Mock(**mockargs)
 
@@ -294,13 +302,14 @@ class TestFormatMQTTVarsJson:
     @pytest.fixture(name="fulltest")
     def fix_mqtt_publish_test(self):
         spec = {
-            "test_name": "An mqtt test with a single stage",
+            "name": "An mqtt test with a single stage",
             "mqtt": {
                 "connect": "localhost",
             },
             "stages": [
                 {
-                    "name": "step 1",
+                    "name": "test",
+                    "description": "step 1",
                     "mqtt_publish": {
                         "topic": "/abc/123",
                         "json": {
@@ -340,7 +349,7 @@ class TestFormatMQTTVarsJson:
         )
 
         with patch("tavern._plugins.mqtt.client.paho.Client", fake_client), \
-        patch("tavern.core.get_extra_sessions", return_value={"paho-mqtt": fake_client}) as pmock:
+                patch("tavern.core.get_extra_sessions", return_value={"paho-mqtt": fake_client}) as pmock:
             run_test("heif", fulltest, includes)
 
         assert pmock.called
@@ -353,13 +362,14 @@ class TestFormatMQTTVarsPlain:
     @pytest.fixture(name="fulltest")
     def fix_mqtt_publish_test(self):
         spec = {
-            "test_name": "An mqtt test with a single stage",
+            "name": "An mqtt test with a single stage",
             "mqtt": {
                 "connect": "localhost",
             },
             "stages": [
                 {
-                    "name": "step 1",
+                    "name": "test",
+                    "description": "step 1",
                     "mqtt_publish": {
                         "topic": "/abc/123",
                         "payload": "hello",
@@ -392,7 +402,7 @@ class TestFormatMQTTVarsPlain:
         )
 
         with patch("tavern._plugins.mqtt.client.paho.Client", fake_client), \
-        patch("tavern.core.get_extra_sessions", return_value={"paho-mqtt": fake_client}) as pmock:
+                patch("tavern.core.get_extra_sessions", return_value={"paho-mqtt": fake_client}) as pmock:
             run_test("heif", fulltest, includes)
 
         assert pmock.called

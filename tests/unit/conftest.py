@@ -4,6 +4,7 @@ import pytest
 @pytest.fixture(name="includes")
 def fix_example_includes():
     includes = {
+        "name": "includes",
         "variables": {
             "request": {
                 "prefix": "www.",
@@ -20,8 +21,8 @@ def fix_example_includes():
         },
         "strict": True,
         "stages": [{
-            "id": "my_external_stage",
-            "name": "My external stage",
+            "name": "my_external_stage",
+            "description": "My external stage",
             "request": {
                 "url": "http://www.bing.com",
                 "method": "GET",

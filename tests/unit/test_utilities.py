@@ -256,7 +256,7 @@ class TestMatchRecursive:
 def fix_test_yaml():
     text = dedent("""
     ---
-    test_name: Make sure server doubles number properly
+    name: Make sure server doubles number properly
 
     stages:
       - name: Make sure number is returned correctly
