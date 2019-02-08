@@ -83,11 +83,14 @@ def get_request_args(rspec, test_block_config):
 
     if "files" in rspec:
         if any(ckey in rspec for ckey in content_keys):
-            raise exceptions.BadSchemaError("Tried to send non-file content alongside a file")
+            raise exceptions.BadSchemaError(
+                "Tried to send non-file content alongside a file")
 
         if has_content_header:
-            logger.warning("Tried to specify a content-type header while sending a file - this will be ignored")
-            rspec["headers"] = {i: j for i, j in headers.items() if i.lower() != "content-type"}
+            logger.warning(
+                "Tried to specify a content-type header while sending a file - this will be ignored")
+            rspec["headers"] = {
+                i: j for i, j in headers.items() if i.lower() != "content-type"}
     elif headers:
         # This should only be hit if we aren't sending a file
         if not has_content_header:
@@ -148,7 +151,8 @@ def get_request_args(rspec, test_block_config):
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
     if request_args["method"] in ["GET", "HEAD", "OPTIONS"]:
         if any(i in request_args for i in ["json", "data"]):
-            warnings.warn("You are trying to send a body with a HTTP verb that has no semantic use for it", RuntimeWarning)
+            warnings.warn(
+                "You are trying to send a body with a HTTP verb that has no semantic use for it", RuntimeWarning)
 
     return request_args
 
@@ -244,11 +248,13 @@ class RestRequest(BaseRequest):
             content_type, encoding = mimetypes.guess_type((filepath))
             if content_type:
                 # a 3-tuple ('filename', fileobj, 'content_type')
-                logger.debug("content_type for '%s' = '%s'", filename, content_type)
+                logger.debug("content_type for '%s' = '%s'",
+                             filename, content_type)
                 file_spec.append(content_type)
                 if encoding:
                     # or a 4-tuple ('filename', fileobj, 'content_type', custom_headers)
-                    logger.debug("encoding for '%s' = '%s'", filename, encoding)
+                    logger.debug("encoding for '%s' = '%s'",
+                                 filename, encoding)
                     # encoding is None for no encoding or the name of the
                     # program used to encode (e.g. compress or gzip). The
                     # encoding is suitable for use as a Content-Encoding header.

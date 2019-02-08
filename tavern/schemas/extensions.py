@@ -6,6 +6,8 @@ import importlib
 from future.utils import raise_from
 
 from tavern.util.exceptions import BadSchemaError
+from tavern.util.exceptions import InvalidBuildInComparatorError
+from tavern.util.comparator_util import get_uniform_comparator
 from tavern.util import exceptions
 from tavern.util.loader import ApproxScalar
 
@@ -36,12 +38,18 @@ def import_ext_function(entrypoint):
     """
     logger = _getlogger()
 
-    try:
-        module, funcname = entrypoint.split(":")
-    except ValueError as e:
-        msg = "Expected entrypoint in the form module.submodule:function"
+    match = re.match(r"^(([\w_\.]+):)?([\w_]+)$", entrypoint)
+
+    if not match:
+        msg = "Expected entrypoint in the form module.submodule:function or builtin_function"
         logger.exception(msg)
-        raise_from(exceptions.InvalidExtFunctionError(msg), e)
+        raise exceptions.InvalidExtFunctionError(msg)
+
+    module = match.group(2)
+    funcname = match.group(3)
+
+    if not module:
+        module = "tavern.util.built_in"
 
     try:
         module = importlib.import_module(module)
@@ -58,6 +66,44 @@ def import_ext_function(entrypoint):
         raise_from(exceptions.InvalidExtFunctionError(msg), e)
 
     return function
+
+
+def validate_block(value, rule_obj, path):
+    """
+        response validate block, can use build_in comparators and ext
+    """
+
+    # pylint: disable=unused-argument
+
+    if not isinstance(value, list):
+        raise BadSchemaError(
+            "unexpect value type of validate block:{}".format(type(value)))
+
+    for item in value:
+        if not isinstance(item, dict):
+            raise BadSchemaError(
+                "unexpect value type of validate block item:{}".format(type(item)))
+        keys = item.keys()
+        if len(keys) != 1:
+            raise BadSchemaError(
+                "keys in validate block should have only one keys in each item")
+
+        for key, _ in item.items():
+            if key == "$ext":
+                validate_extensions(item, None, None)
+            else:
+                try:
+                    get_uniform_comparator(key)
+                except InvalidBuildInComparatorError as e:
+                    raise_from(BadSchemaError(
+                        "Unexpect key of {} passed to validate block item".format(key)), e)
+                else:
+                    value = item[key]
+                    if not isinstance(value, (list, tuple)):
+                        raise BadSchemaError(
+                            "comparators value should be list or tuple,but actual:{}".format(type(value)))
+
+    return True
 
 
 def get_wrapped_response_function(ext):
@@ -125,7 +171,8 @@ def validate_extensions(value, rule_obj, path):
     try:
         iter(value)
     except TypeError as e:
-        raise_from(BadSchemaError("Invalid value for key - things like body/params/headers/data have to be iterable (list, dictionary, string), not a single value"), e)
+        raise_from(BadSchemaError(
+            "Invalid value for key - things like body/params/headers/data have to be iterable (list, dictionary, string), not a single value"), e)
 
     if isinstance(value, dict) and "$ext" in value:
         expected_keys = {
@@ -138,31 +185,36 @@ def validate_extensions(value, rule_obj, path):
 
         extra = set(validate_keys) - expected_keys
         if extra:
-            raise BadSchemaError("Unexpected keys passed to $ext: {}".format(extra))
+            raise BadSchemaError(
+                "Unexpected keys passed to $ext: {}".format(extra))
 
         if "function" not in validate_keys:
             raise BadSchemaError("No function specified for validation")
 
         try:
             import_ext_function(validate_keys["function"])
-        except Exception as e: # pylint: disable=broad-except
-            raise_from(BadSchemaError("Couldn't load {}".format(validate_keys["function"])), e)
+        except Exception as e:  # pylint: disable=broad-except
+            raise_from(BadSchemaError(
+                "Couldn't load {}".format(validate_keys["function"])), e)
 
         extra_args = validate_keys.get("extra_args")
         extra_kwargs = validate_keys.get("extra_kwargs")
 
         if extra_args and not isinstance(extra_args, list):
-            raise BadSchemaError("Expected a list of extra_args, got {}".format(type(extra_args)))
+            raise BadSchemaError(
+                "Expected a list of extra_args, got {}".format(type(extra_args)))
 
         if extra_kwargs and not isinstance(extra_kwargs, dict):
-            raise BadSchemaError("Expected a dict of extra_kwargs, got {}".format(type(extra_args)))
+            raise BadSchemaError(
+                "Expected a dict of extra_kwargs, got {}".format(type(extra_args)))
 
     return True
 
 
 def validate_status_code_is_int_or_list_of_ints(value, rule_obj, path):
     # pylint: disable=unused-argument
-    err_msg = "status_code has to be an integer or a list of integers (got {})".format(value)
+    err_msg = "status_code has to be an integer or a list of integers (got {})".format(
+        value)
 
     if not isinstance(value, (int, list)):
         raise BadSchemaError(err_msg)
@@ -254,7 +306,8 @@ def validate_data_key_with_ext_function(value, rule_obj, path):
         # Also fine - might want to do checking on this for encoding etc?
         pass
     elif isinstance(value, list):
-        raise BadSchemaError("Error at {} - expected a dict, str, or !!binary".format(path))
+        raise BadSchemaError(
+            "Error at {} - expected a dict, str, or !!binary".format(path))
 
         # invalid = []
 
@@ -268,7 +321,8 @@ def validate_data_key_with_ext_function(value, rule_obj, path):
         # if invalid:
         #     raise BadSchemaError("Error at {} - when passing a list to the 'data' key, all items must be 2-tuples (invalid values: {})".format(path, invalid))
     else:
-        raise BadSchemaError("Error at {} - expected a dict, str, or !!binary".format(path))
+        raise BadSchemaError(
+            "Error at {} - expected a dict, str, or !!binary".format(path))
 
     return True
 
@@ -280,7 +334,8 @@ def validate_json_with_extensions(value, rule_obj, path):
     validate_extensions(value, rule_obj, path)
 
     if not isinstance(value, (list, dict)):
-        raise BadSchemaError("Error at {} - expected a list or dict".format(path))
+        raise BadSchemaError(
+            "Error at {} - expected a list or dict".format(path))
 
     def nested_values(d):
         if isinstance(d, dict):
@@ -296,7 +351,8 @@ def validate_json_with_extensions(value, rule_obj, path):
     if any(isinstance(i, ApproxScalar) for i in nested_values(value)):
         # If this is a request data block
         if not re.search(r"^/stages/\d/(response/body|mqtt_response/json)", path):
-            raise BadSchemaError("Error at {} - Cannot use a '!approx' in anything other than an expected http response body or mqtt response json".format(path))
+            raise BadSchemaError(
+                "Error at {} - Cannot use a '!approx' in anything other than an expected http response body or mqtt response json".format(path))
 
     return True
 
@@ -309,7 +365,8 @@ def check_strict_key(value, rule_obj, path):
         raise BadSchemaError("'strict' has to be either a boolean or a list")
     elif isinstance(value, list):
         if not set(["body", "headers", "redirect_query_params"]) >= set(value):
-            raise BadSchemaError("Invalid 'strict' keys passed: {}".format(value))
+            raise BadSchemaError(
+                "Invalid 'strict' keys passed: {}".format(value))
 
     return True
 
@@ -318,7 +375,8 @@ def validate_timeout_tuple_or_float(value, rule_obj, path):
     """Make sure timeout is a float/int or a tuple of floats/ints"""
     # pylint: disable=unused-argument
 
-    err_msg = "'timeout' must be either a float/int or a 2-tuple of floats/ints - got '{}' (type {})".format(value, type(value))
+    err_msg = "'timeout' must be either a float/int or a 2-tuple of floats/ints - got '{}' (type {})".format(
+        value, type(value))
     logger = _getlogger()
 
     def check_is_timeout_val(v):

@@ -40,14 +40,22 @@ def _resolve_reference_stage(raw_stage, available_stages):
         return raw_stage
 
 
-def _resolve_test_stages(test_spec, variables, parse_stages=True):
+def initializa_environ_variables(variables):
+    tavern_box = Box({
+        "env_vars": dict(os.environ),
+    })
+    variables["tavern"] = tavern_box
+
+
+def resolve_spec(test_spec, variables, parse_stages=True):
     # Need to get a final list of stages in the tests (resolving refs)
     final_stages = {}
     # resolve stage in includes first
 
     if "includes" in test_spec:
         for included in test_spec["includes"]:
-            includedStages = _resolve_test_stages(included, variables)
+            includedStages = resolve_spec(
+                included, variables, parse_stages)
             final_stages.update(includedStages)
 
     if "variables" in test_spec:
@@ -96,11 +104,7 @@ def run_test(in_file, test_spec, global_cfg):
     if "variables" not in test_block_config:
         test_block_config["variables"] = {}
 
-    tavern_box = Box({
-        "env_vars": dict(os.environ),
-    })
-
-    test_block_config["variables"]["tavern"] = tavern_box
+    initializa_environ_variables(test_block_config["variables"])
 
     test_block_name = test_spec["name"]
 
@@ -110,8 +114,8 @@ def run_test(in_file, test_spec, global_cfg):
     logger.info("Running test : %s", test_block_name)
     logger.debug("variables:%s", json.dumps(test_block_config))
     with ExitStack() as stack:
-        final_stages = _resolve_test_stages(
-            test_spec, test_block_config["variables"], False)
+        final_stages = resolve_spec(
+            test_spec, test_block_config["variables"])
 
         for stage in test_spec["stages"]:
             if "ref" in stage:
@@ -156,7 +160,7 @@ def run_test(in_file, test_spec, global_cfg):
             run_stage_with_retries = retry(stage)(run_stage)
             try:
                 run_stage_with_retries(
-                    sessions, stage, tavern_box, test_block_config)
+                    sessions, stage, test_block_config)
             except exceptions.TavernException as e:
                 e.stage = stage
                 e.test_block_config = test_block_config
@@ -166,7 +170,7 @@ def run_test(in_file, test_spec, global_cfg):
                 break
 
 
-def run_stage(sessions, stage, tavern_box, test_block_config):
+def run_stage(sessions, stage, test_block_config):
     """Run one stage from the test
 
     Args:
@@ -180,7 +184,7 @@ def run_stage(sessions, stage, tavern_box, test_block_config):
 
     r = get_request_type(stage, test_block_config, sessions)
 
-    tavern_box.update(request_vars=r.request_vars)
+    test_block_config["variables"].update(request=r.request_vars)
 
     expected = get_expected(stage, test_block_config, sessions)
 
@@ -193,7 +197,7 @@ def run_stage(sessions, stage, tavern_box, test_block_config):
         saved = v.verify(response)
         test_block_config["variables"].update(saved)
 
-    tavern_box.pop("request_vars")
+    test_block_config["variables"].pop("request")
     delay(stage, "after")
 
 

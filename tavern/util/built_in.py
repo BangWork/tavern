@@ -1,42 +1,45 @@
 import re
 import logging
-import json
-from deepdiff import DeepDiff
+import random
 from tavern.util.compat import basestring, builtin_str, integer_types
 
 logger = logging.getLogger(__name__)
 
 
-# def dict_equal(src_data, dst_data):
-#     assert type(src_data) == type(dst_data), "type: '{}' != '{}'".format(
-#         type(src_data), type(dst_data))
-#     if isinstance(src_data, dict):
-#         for key in src_data:
-#             assert dst_data.has_key(key)
-#             dict_equal(src_data[key], dst_data[key])
-#     elif isinstance(src_data, list):
-#         for src_list, dst_list in zip(sorted(src_data), sorted(dst_data)):
-#             dict_equal(src_list, dst_list)
-#     else:
-#         assert src_data == dst_data, "value '{}' != '{}'".format(
-#             src_data, dst_data)
+def random_string(num=8, checked=""):
+    seed = "0123456789AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz"
+    salt = []
+    for _ in range(num):
+        salt.append(random.choice(seed))
+    random_string = checked + ''.join(salt)
+    return random_string
 
 
-# def list_equal(src_data, dst_data):
-#     assert len(src_data) == len(dst_data)
-#     if len(src_data) == len(dst_data):
-#         for i in range(len(src_data)):
-#             dict_equal(src_data[i], dst_data[i])
+def uuid(checked=""):
+    return random_string(checked=checked)
 
 
-def deep_equal(check_value, expect_value):
-    diff = DeepDiff(check_value, expect_value)
-    diff_keys_length = len(diff.keys())
-    assert diff_keys_length == 0, json.dumps(diff, indent=4)
+# comparator
+def equals(check_value, expect_value):
+    if isinstance(check_value, dict):
+        assert isinstance(expect_value, dict), "type not equal: '{}' != '{}'".format(
+            check_value, expect_value)
 
+        for key in check_value:
+            assert key in expect_value, "key not equal:'{}' != '{}'".format(
+                check_value, expect_value)
+            equals(check_value[key], expect_value[key])
+    elif isinstance(check_value, (list, tuple)):
+        assert isinstance(expect_value, (list, tuple)), "type not equal: '{}' != '{}'".format(
+            check_value, expect_value)
+        assert len(check_value) == len(expect_value), "list length not equal:'{}' != '{}'".format(
+            check_value, expect_value)
 
-def equal(check_value, expect_value):
-    assert check_value == expect_value
+        for index, _ in enumerate(check_value):
+            equals(check_value[index], expect_value[index])
+    else:
+        assert check_value == expect_value, "value '{}' != '{}'".format(
+            check_value, expect_value)
 
 
 def less_than(check_value, expect_value):

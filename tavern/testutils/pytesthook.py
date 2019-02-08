@@ -15,7 +15,7 @@ from _pytest._code.code import FormattedExcinfo
 from future.utils import raise_from
 
 from box import Box
-from tavern.core import run_test
+from tavern.core import run_test, resolve_spec, initializa_environ_variables
 from tavern.plugins import load_plugins
 from tavern.schemas.files import verify_tests
 from tavern.util import exceptions
@@ -230,10 +230,14 @@ class YamlFile(pytest.File):
             # skipif: {my_integer} > 2
             # skipif: 'https' in '{hostname}'
             # skipif: '{hostname}'.contains('ignoreme')
-            included = test_spec.get("includes", [])
+
             fmt_vars = {}
-            for i in included:
-                fmt_vars.update(**i.get("variables", {}))
+
+            # intialize fmt_vars with environ variables
+            initializa_environ_variables(fmt_vars)
+
+            # resolve all variables in include and spec
+            resolve_spec(test_spec, fmt_vars, False)
 
             pytest_marks = []
 

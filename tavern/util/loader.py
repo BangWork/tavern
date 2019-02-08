@@ -6,6 +6,7 @@ import uuid
 import os.path
 import pytest
 from future.utils import raise_from
+from builtins import str as ustr
 
 import yaml
 from yaml.reader import Reader
@@ -15,7 +16,7 @@ from yaml.composer import Composer
 from yaml.constructor import SafeConstructor
 from yaml.resolver import Resolver
 
-from tavern.util.exceptions import BadSchemaError
+from tavern.util.exceptions import BadSchemaError, InvalidTypeToConvertError
 
 
 logger = logging.getLogger(__name__)
@@ -60,8 +61,10 @@ def create_node_class(cls):
     node_class.__name__ = '%s_node' % cls.__name__
     return node_class
 
+
 dict_node = create_node_class(dict)
 list_node = create_node_class(list)
+
 
 class SourceMappingConstructor(SafeConstructor):
     # To support lazy loading, the original constructors first yield
@@ -79,20 +82,22 @@ class SourceMappingConstructor(SafeConstructor):
 
 
 SourceMappingConstructor.add_constructor(
-        u'tag:yaml.org,2002:map',
-        SourceMappingConstructor.construct_yaml_map)
+    u'tag:yaml.org,2002:map',
+    SourceMappingConstructor.construct_yaml_map)
 
 SourceMappingConstructor.add_constructor(
-        u'tag:yaml.org,2002:seq',
-        SourceMappingConstructor.construct_yaml_seq)
+    u'tag:yaml.org,2002:seq',
+    SourceMappingConstructor.construct_yaml_seq)
 
-yaml.add_representer(dict_node, yaml.representer.SafeRepresenter.represent_dict)
-yaml.add_representer(list_node, yaml.representer.SafeRepresenter.represent_list)
+yaml.add_representer(
+    dict_node, yaml.representer.SafeRepresenter.represent_dict)
+yaml.add_representer(
+    list_node, yaml.representer.SafeRepresenter.represent_list)
 
 
 # pylint: disable=too-many-ancestors
 class IncludeLoader(Reader, Scanner, Parser, RememberComposer, Resolver,
-        SourceMappingConstructor, SafeConstructor):
+                    SourceMappingConstructor, SafeConstructor):
     """YAML Loader with `!include` constructor and which can remember anchors
     between documents"""
 
@@ -148,11 +153,12 @@ class TypeSentinel(yaml.YAMLObject):
         return cls()
 
     def __str__(self):
-        return "<Tavern YAML sentinel for {}>".format(self.constructor) # pylint: disable=no-member
+        return "<Tavern YAML sentinel for {}>".format(self.constructor)  # pylint: disable=no-member
 
     @classmethod
     def to_yaml(cls, dumper, data):
-        node = yaml.nodes.ScalarNode(cls.yaml_tag, "", style=cls.yaml_flow_style)
+        node = yaml.nodes.ScalarNode(
+            cls.yaml_tag, "", style=cls.yaml_flow_style)
         return node
 
 
@@ -160,17 +166,21 @@ class IntSentinel(TypeSentinel):
     yaml_tag = "!anyint"
     constructor = int
 
+
 class FloatSentinel(TypeSentinel):
     yaml_tag = "!anyfloat"
     constructor = float
+
 
 class StrSentinel(TypeSentinel):
     yaml_tag = "!anystr"
     constructor = str
 
+
 class BoolSentinel(TypeSentinel):
     yaml_tag = "!anybool"
     constructor = bool
+
 
 class AnythingSentinel(TypeSentinel):
     yaml_tag = "!anything"
@@ -216,9 +226,13 @@ class TypeConvertToken(yaml.YAMLObject):
     def from_yaml(cls, loader, node):
         value = loader.construct_scalar(node)
 
+        if not isinstance(value, (ustr, str)):
+            raise InvalidTypeToConvertError(
+                "Type convert only valid for str value")
+
         try:
             # See if it's already a valid value (eg, if we do `!int "2"`)
-            converted = cls.constructor(value) # pylint: disable=no-member
+            converted = cls.constructor(value)  # pylint: disable=no-member
         except ValueError:
             # If not (eg, `!int "{int_value:d}"`)
             return cls(value)
@@ -252,6 +266,16 @@ class BoolToken(TypeConvertToken):
     constructor = StrToBoolConstructor
 
 
+class DictToken(TypeConvertToken):
+    yaml_tag = "!dict"
+    constructor = dict
+
+
+class TupleToken(TypeConvertToken):
+    yaml_tag = "!tuple"
+    constructor = tuple
+
+
 class StrToRawConstructor(object):
     """Used when we want to ignore brace formatting syntax"""
 
@@ -267,6 +291,7 @@ class RawStrToken(TypeConvertToken):
 # Sort-of hack to try and avoid future API changes
 ApproxScalar = type(pytest.approx(1.0))
 
+
 class ApproxSentinel(yaml.YAMLObject, ApproxScalar):
     yaml_tag = "!approx"
     yaml_loader = IncludeLoader
@@ -277,7 +302,8 @@ class ApproxSentinel(yaml.YAMLObject, ApproxScalar):
         try:
             val = float(node.value)
         except (ValueError, TypeError) as e:
-            logger.error("Could not coerce '%s' to a float for use with !approx", type(node.value))
+            logger.error(
+                "Could not coerce '%s' to a float for use with !approx", type(node.value))
             raise_from(BadSchemaError, e)
 
         return pytest.approx(val)

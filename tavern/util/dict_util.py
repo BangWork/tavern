@@ -1,16 +1,58 @@
 import collections
 import warnings
 import logging
+import re
 from builtins import str as ustr
 
 from future.utils import raise_from
 from box import Box
+from tavern.schemas.extensions import get_wrapped_create_function
+
+from . import compat
 
 from tavern.util.loader import TypeConvertToken, ANYTHING, TypeSentinel
 from . import exceptions
 
 
 logger = logging.getLogger(__name__)
+
+
+def run_ext_function(ext, variables, *args, **kwargs):
+    formatted_ext = format_keys(ext, variables)
+    ext_fn = get_wrapped_create_function(formatted_ext)
+    try:
+        formatted = ext_fn(*args, **kwargs)
+    except Exception as e:  # pylint: disable=broad-except
+        raise_from(exceptions.CallExtFunctionError(
+            """
+            Call $ext function error:
+            func: {function}
+            args: {extra_args}
+            kwargs: {extra_kwargs}
+            """.format(**ext)), e)
+    else:
+        return formatted
+    return
+
+
+def format_string(val, variables):
+    """
+    Args:
+        val (dict): Input dictionary to format
+        variables (dict): Dictionary of keys to format it with
+
+    Returns:
+        return str when format like "acb {} a {} bc"
+        return others when format like "{}"
+    """
+    match = re.match(r"^\{([^\{\}]+)\}$", val)
+    if match is not None and match.groups():
+        match_str = match.group(1)
+        logger.debug("found match str:'%s'", match_str)
+        split_keys = match_str.split(".")
+        return recurse_access_key(variables, split_keys)
+
+    return val.format(**variables)
 
 
 def format_keys(val, variables):
@@ -27,15 +69,20 @@ def format_keys(val, variables):
     box_vars = Box(variables)
 
     if isinstance(val, dict):
-        formatted = {}
-        #formatted = {key: format_keys(val[key], box_vars) for key in val}
-        for key in val:
-            formatted[key] = format_keys(val[key], box_vars)
+
+        # formatted = {key: format_keys(val[key], box_vars) for key in val}
+        # format_keys 增加了对于 yaml 中 dict 类型中包含 $ext 关键字的解析
+        if "$ext" in val:
+            run_ext_function(val["$ext"], variables)
+        else:
+            formatted = {}
+            for key in val:
+                formatted[key] = format_keys(val[key], box_vars)
     elif isinstance(val, (list, tuple)):
         formatted = [format_keys(item, box_vars) for item in val]
     elif isinstance(val, (ustr, str)):
         try:
-            formatted = val.format(**box_vars)
+            formatted = format_string(val, box_vars)
         except KeyError as e:
             logger.error("Failed to resolve string [%s] with variables [%s]",
                          val, box_vars)
@@ -49,6 +96,51 @@ def format_keys(val, variables):
         formatted = val.constructor(value)
 
     return formatted
+
+
+def recurse_set_value(current_value, keys, value):
+    """
+        Given a list of keys and a dictionary, recursively set value by keys
+
+        If a key is an interge, it will convert it and use it as a list or tuple index,
+        index must in range
+
+        Example:
+
+            >>> recurse_access_key({}, ['a','b'], "a")
+            {'a':{'b':"a"}}
+
+            >>> recurse_access_key({},['a',0],"a")
+            {'a':["a"]}
+    """
+    def get_key(key):
+        try:
+            key = int(key)
+        except ValueError:
+            pass
+        return key
+
+    obj = current_value
+    while keys:
+        key = get_key(keys.pop(0))
+
+        if not keys:
+            obj[key] = value
+            return
+
+        if isinstance(key, int) or key in obj:
+            obj = obj[key]
+            return
+
+        next_key = get_key(keys[0])
+
+        if isinstance(next_key, int):
+            obj[key] = []
+            return
+
+        obj[key] = {}
+
+    return current_value
 
 
 def recurse_access_key(current_val, keys):
@@ -263,12 +355,13 @@ def check_keys_match_recursive(expected_val, actual_val, keys, strict=True):
         # At this point, there is likely to be an error unless we're using any
         # of the type sentinels
 
-        if not (expected_val is ANYTHING): # pylint: disable=superfluous-parens
+        if not (expected_val is ANYTHING):  # pylint: disable=superfluous-parens
             # NOTE
             # Second part of this check will be removed in future - see deprecation
             # warning below for details
             if not expected_matches and expected_val is not None:
-                raise_from(exceptions.KeyMismatchError("Type of returned data was different than expected ({})".format(full_err())), e)
+                raise_from(exceptions.KeyMismatchError(
+                    "Type of returned data was different than expected ({})".format(full_err())), e)
 
         if isinstance(expected_val, dict):
             akeys = set(actual_val.keys())
@@ -280,11 +373,14 @@ def check_keys_match_recursive(expected_val, actual_val, keys, strict=True):
 
                 msg = ""
                 if extra_actual_keys:
-                    msg += " - Extra keys in response: {}".format(extra_actual_keys)
+                    msg += " - Extra keys in response: {}".format(
+                        extra_actual_keys)
                 if extra_expected_keys:
-                    msg += " - Keys missing from response: {}".format(extra_expected_keys)
+                    msg += " - Keys missing from response: {}".format(
+                        extra_expected_keys)
 
-                full_msg = "Structure of returned data was different than expected {} ({})".format(msg, full_err())
+                full_msg = "Structure of returned data was different than expected {} ({})".format(
+                    msg, full_err())
 
                 # If there are more keys in 'expected' compared to 'actual',
                 # this is still a hard error and we shouldn't continue
@@ -299,19 +395,23 @@ def check_keys_match_recursive(expected_val, actual_val, keys, strict=True):
 
             for key in to_recurse:
                 try:
-                    check_keys_match_recursive(expected_val[key], actual_val[key], keys + [key], strict)
+                    check_keys_match_recursive(
+                        expected_val[key], actual_val[key], keys + [key], strict)
                 except KeyError:
-                    logger.debug("Skipping comparing missing key %s due to strict=%s", key, strict)
+                    logger.debug(
+                        "Skipping comparing missing key %s due to strict=%s", key, strict)
         elif isinstance(expected_val, list):
             if len(expected_val) != len(actual_val):
-                raise_from(exceptions.KeyMismatchError("Length of returned list was different than expected - expected {} items, got {} ({})".format(len(expected_val), len(actual_val), full_err())), e)
+                raise_from(exceptions.KeyMismatchError(
+                    "Length of returned list was different than expected - expected {} items, got {} ({})".format(len(expected_val), len(actual_val), full_err())), e)
 
             # TODO
             # Check things in the wrong order?
 
             for i, (e_val, a_val) in enumerate(zip(expected_val, actual_val)):
                 try:
-                    check_keys_match_recursive(e_val, a_val, keys + [i], strict)
+                    check_keys_match_recursive(
+                        e_val, a_val, keys + [i], strict)
                 except exceptions.KeyMismatchError as sub_e:
                     # This will still raise an error, but it will be more
                     # obvious where the error came from (in python 3 at least)
@@ -322,6 +422,8 @@ def check_keys_match_recursive(expected_val, actual_val, keys, strict=True):
         elif expected_val is ANYTHING:
             logger.debug("Actual value = '%s' - matches !anything", actual_val)
         elif isinstance(expected_val, TypeSentinel) and expected_matches:
-            logger.debug("Actual value = '%s' - matches !any%s", actual_val, expected_val.constructor)
+            logger.debug("Actual value = '%s' - matches !any%s",
+                         actual_val, expected_val.constructor)
         else:
-            raise_from(exceptions.KeyMismatchError("Key mismatch: ({})".format(full_err())), e)
+            raise_from(exceptions.KeyMismatchError(
+                "Key mismatch: ({})".format(full_err())), e)

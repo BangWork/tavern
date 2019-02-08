@@ -26,11 +26,14 @@ class TavernRestPlugin(PluginHelperBase):
         try:
             r_expected = stage["response"]
         except KeyError as e:
-            logger.error("Need a 'response' block if a 'request' is being sent")
+            logger.error(
+                "Need a 'response' block if a 'request' is being sent")
             raise_from(exceptions.MissingSettingsError, e)
-
-        f_expected = format_keys(r_expected, test_block_config["variables"])
-        return f_expected
+        # 此处原本是为了在初始化 response 的时候，就已经用 variables 去替换模版。但其实在 verify 里做更好
+        # 因为我们的定制化代码里，让 format_keys 支持了每一个参数都可以使用 $ext 去获取其值
+        # 故而此处不需要预先进行转换了
+        # f_expected = format_keys(r_expected, test_block_config["variables"])
+        return r_expected
 
     verifier_type = RestResponse
     response_block_name = "response"

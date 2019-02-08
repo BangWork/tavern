@@ -5,11 +5,11 @@ import pytest
 import yaml
 import copy
 
-from tavern.schemas.extensions import validate_extensions
+from tavern.schemas.extensions import validate_extensions, validate_block
 from tavern.util import exceptions
 from tavern.util.loader import ANYTHING, IncludeLoader
 from tavern.util.dict_util import deep_dict_merge, check_keys_match_recursive, format_keys
-from tavern.util.comparators import deep_equal
+from tavern.util.built_in import equals
 
 
 class TestValidateFunctions:
@@ -53,6 +53,168 @@ class TestValidateFunctions:
 
         with pytest.raises(exceptions.BadSchemaError):
             validate_extensions(spec, None, None)
+
+
+class TestValidateBlock:
+    def test_validate_block(self):
+        """valid validator
+        """
+        spec = [
+            # equal
+            {
+                "eq": ["a", "a"]
+            },
+            {
+                "equals": ["a", "a"]
+            },
+            {
+                "==": ["a", "a"]
+            },
+            {
+                "is": ["a", "a"]
+            },
+
+            # less_than
+            {
+                "lt": ["a", "a"]
+            },
+            {
+                "less_than": ["a", "a"]
+            },
+
+            # less_than_or_equals
+            {
+                "le": ["a", "a"]
+            },
+            {
+                "less_than_or_equals": ["a", "a"]
+            },
+
+            # greater_than
+            {
+                "gt": ["a", "a"]
+            },
+            {
+                "greater_than": ["a", "a"]
+            },
+
+            # greater_than_or_equals
+            {
+                "ge": ["a", "a"]
+            },
+            {
+                "greater_than_or_equals": ["a", "a"]
+            },
+            # not_equals
+            {
+                "ne": ["a", "a"]
+            },
+            {
+                "not_equals": ["a", "a"]
+            },
+            # string_equals
+            {
+                "str_eq": ["a", "a"]
+            },
+            {
+                "string_equals": ["a", "a"]
+            },
+
+            # length_equals
+            {
+                "len_eq": ["a", "a"]
+            },
+            {
+                "length_equals": ["a", "a"]
+            },
+            {
+                "count_eq": ["a", "a"]
+            },
+
+            # length_greater_than
+            {
+                "len_gt": ["a", "a"]
+            },
+            {
+                "count_gt": ["a", "a"]
+            },
+            {
+                "length_greater_than": ["a", "a"]
+            },
+            {
+                "count_greater_than": ["a", "a"]
+            },
+
+            # length_greater_than_or_equals
+            {
+                "len_ge": ["a", "a"]
+            },
+            {
+                "count_ge": ["a", "a"]
+            },
+            {
+                "length_greater_than_or_equals": ["a", "a"]
+            },
+            {
+                "count_greater_than_or_equals": ["a", "a"]
+            },
+
+            # length_less_than
+            {
+                "len_lt": ["a", "a"]
+            },
+            {
+                "count_lt": ["a", "a"]
+            },
+            {
+                "length_less_than": ["a", "a"]
+            },
+            {
+                "count_less_than": ["a", "a"]
+            },
+
+            # length_less_than_or_equals
+            {
+                "len_le": ["a", "a"]
+            },
+            {
+                "count_le": ["a", "a"]
+            },
+            {
+                "length_less_than_or_equals": ["a", "a"]
+            },
+            {
+                "count_less_than_or_equals": ["a", "a"]
+            },
+            {
+                "$ext": {
+                    "function": "random_string",
+                    "extra_args": [1]
+                }
+            },
+            {
+                "$ext": {
+                    "function": "random_string",
+                    "extra_args": [1],
+                    "extra_kwargs":{
+                        "checked": "123"
+                    }
+                }
+            }
+        ]
+        validate_block(spec, None, None)
+
+    def test_not_valid_block(self):
+        """Not valid comparators
+        """
+        spec = [
+            {
+                "not_valid": ["b", "b"]
+            }
+        ]
+
+        with pytest.raises(exceptions.BadSchemaError):
+            validate_block(spec, None, None)
 
 
 class TestDictMerge:
@@ -329,4 +491,5 @@ class TestComparators:
     def test_deep_diff(self):
         a1 = {"a": 1}
         a2 = {"a": 2}
-        deep_equal(a1, a2)
+        with pytest.raises(AssertionError):
+            equals(a1, a2)

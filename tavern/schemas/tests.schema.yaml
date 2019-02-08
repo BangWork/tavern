@@ -25,6 +25,11 @@ schema;any_map_or_list_with_ext_function:
   type: any
   required: false
 
+schema;validate_block:
+  func: validate_block
+  type: any
+  required: false
+
 schema;stage:
   type: map
   required: true
@@ -186,17 +191,11 @@ schema;stage:
             - type: str
               unique: true
 
-        re;(headers|redirect_query_params):
-          include: any_map_with_ext_function
-
-        body:
-          include: any_map_or_list_with_ext_function
+        validate:
+          include: validate_block
 
         save:
           include: any_map_with_ext_function
-          mapping:
-            re;(\$ext|body|headers|redirect_query_params):
-              type: any
 
 schema;stage_ref:
   type: map

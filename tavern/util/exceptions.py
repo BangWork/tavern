@@ -91,3 +91,15 @@ class InvalidStageReferenceError(TavernException):
 
 class DuplicateStageDefinitionError(TavernException):
     """Stage with the specified ID previously defined"""
+
+
+class InvalidBuildInComparatorError(TavernException):
+    """Invalid build in comparator"""
+
+
+class InvalidTypeToConvertError(TavernException):
+    """Invalid type for type convert"""
+
+
+class CallExtFunctionError(TavernException):
+    """ call $ext function error """

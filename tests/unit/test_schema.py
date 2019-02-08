@@ -24,8 +24,8 @@ def fix_test_dict():
             content-type: application/json
         response:
           status_code: 200
-          body:
-            double: 10
+          validate:
+            - eq: ["{body.double}",10]
     """)
 
     as_dict = yaml.load(text)
@@ -47,7 +47,9 @@ class TestJSON:
 
     def test_json_list_response(self, test_dict):
         """Response contains a list"""
-        test_dict["stages"][0]["response"]["body"] = [1, "text", -1]
+        test_dict["stages"][0]["response"]["validate"] = [
+            {"eq": ["{body}", [1, "text", -1]]}
+        ]
 
         verify_tests(test_dict)
 

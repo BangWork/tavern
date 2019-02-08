@@ -27,12 +27,11 @@ def fix_example_test():
                 },
                 "response": {
                     "status_code": 200,
-                    "body": {
-                        "key": "value",
-                    },
-                    "headers": {
-                        "content-type": "application/json",
-                    }
+                    "validate": [{
+                        "eq": ["{body}", {"key": "value"}]
+                    }, {
+                        "eq": ["{headers.content-type}", "application/json"]
+                    }]
                 }
             }
         ]
@@ -44,14 +43,14 @@ def fix_example_test():
 @pytest.fixture(name="mockargs")
 def fix_mock_response_args(fulltest):
     response = fulltest["stages"][0]["response"]
-    content = response["body"]
+    content = {"key": "value"}
 
     args = {
         "spec": requests.Response,
         "content": json.dumps(content).encode("utf8"),
         "status_code": response["status_code"],
         "json": lambda: content,
-        "headers": response["headers"],
+        "headers": {"content-type": "application/json"},
     }
 
     return args
@@ -252,18 +251,18 @@ class TestFormatRequestVars:
         fulltest["stages"][0]["request"][request_key] = {
             "a_format_key": sent_value}
 
-        if request_key == "json":
+        if request_key == "json" or request_key == "params":
             resp_key = "body"
-            mockargs[request_key] = lambda: {"returned": sent_value}
+            mockargs[resp_key] = lambda: {"returned": sent_value}
         else:
             resp_key = request_key
-            mockargs[request_key] = {"returned": sent_value}
+            mockargs[resp_key] = {"returned": sent_value}
 
-        fulltest["stages"][0]["response"][resp_key] = {
-            "returned": "{tavern.request_vars.%s.a_format_key:s}" % request_key}
+        fulltest["stages"][0]["response"]["validate"] = [{
+            "eq": [{"returned": "{request.%s}" % request_key}, {"returned": "{request.%s}" % request_key}]
+        }]
 
         mock_response = Mock(**mockargs)
-
         with patch("tavern._plugins.rest.request.requests.Session.request", return_value=mock_response) as pmock:
             run_test("heif", fulltest, includes)
 
@@ -281,11 +280,11 @@ class TestFormatRequestVars:
         fulltest["stages"][0]["request"]["method"] = "POST"
         fulltest["stages"][0]["request"][request_key] = sent_value
 
-        resp_key = request_key
         mockargs[request_key] = {"returned": sent_value}
 
-        fulltest["stages"][0]["response"][resp_key] = {
-            "returned": "{tavern.request_vars.%s:s}" % request_key}
+        fulltest["stages"][0]["response"]["validate"] = [{
+            "eq": [{"returned": "{request.%s}" % request_key}, {"returned": "{request.%s}" % request_key}]
+        }]
 
         mock_response = Mock(**mockargs)
 
@@ -317,9 +316,9 @@ class TestFormatMQTTVarsJson:
                         }
                     },
                     "mqtt_response": {
-                        "topic": "{tavern.request_vars.topic}",
+                        "topic": "{request.topic}",
                         "json": {
-                            "echo": "{tavern.request_vars.json.message}",
+                            "echo": "{request.json.message}",
                         },
                     }
                 }
@@ -375,8 +374,8 @@ class TestFormatMQTTVarsPlain:
                         "payload": "hello",
                     },
                     "mqtt_response": {
-                        "topic": "{tavern.request_vars.topic}",
-                        "payload": "{tavern.request_vars.payload}",
+                        "topic": "{request.topic}",
+                        "payload": "{request.payload}",
                     }
                 }
             ]

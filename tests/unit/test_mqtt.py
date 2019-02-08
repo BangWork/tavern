@@ -60,7 +60,7 @@ class TestClient(object):
         """returns self on success"""
 
         with patch.object(fake_client._client, "loop_start"), \
-        patch.object(fake_client._client, "connect_async"):
+                patch.object(fake_client._client, "connect_async"):
             fake_client._client._state = paho.mqtt_cs_connected
             with fake_client as x:
                 assert fake_client == x
@@ -73,7 +73,7 @@ class TestClient(object):
             rc = 1
 
         with patch.object(fake_client._client, "subscribe"), \
-        patch.object(fake_client._client, "publish", return_value=FakeMessage()):
+                patch.object(fake_client._client, "publish", return_value=FakeMessage()):
             with pytest.raises(exceptions.MQTTError):
                 fake_client.publish("abc", "123")
 
@@ -85,7 +85,7 @@ class TestClient(object):
             rc = 2342423
 
         with patch.object(fake_client._client, "subscribe"), \
-        patch.object(fake_client._client, "publish", return_value=FakeMessage()):
+                patch.object(fake_client._client, "publish", return_value=FakeMessage()):
             with pytest.raises(exceptions.MQTTError):
                 fake_client.publish("abc", "123")
 
@@ -132,7 +132,7 @@ class TestTLS(object):
 @pytest.fixture(name="req")
 def fix_example_request():
     spec = {
-        "topic":  "{request_topic:s}",
+        "topic":  "{request_topic}",
         "payload": "abc123",
     }
 

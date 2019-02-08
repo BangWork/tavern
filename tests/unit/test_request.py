@@ -19,15 +19,15 @@ def fix_example_request():
         "method":  "POST",
         "headers": {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization":  "Basic {test_auth_token:s}",
+            "Authorization":  "Basic {test_auth_token}",
         },
         "data": {
             "a_thing":  "authorization_code",
-            "code":  "{code:s}",
-            "url":  "{callback_url:s}",
+            "code":  "{code}",
+            "url":  "{callback_url}",
             "array": [
-                "{code:s}",
-                "{code:s}",
+                "{code}",
+                "{code}",
             ]
         },
     }
@@ -159,7 +159,8 @@ class TestRequestArgs(object):
 
         args = get_request_args(req, includes)
 
-        assert "content-type" not in [i.lower() for i in args["headers"].keys()]
+        assert "content-type" not in [i.lower()
+                                      for i in args["headers"].keys()]
 
 
 class TestExtFunctions:

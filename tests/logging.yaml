@@ -19,7 +19,7 @@ handlers:
     stderr:
         class: colorlog.StreamHandler
         formatter: default
-
+        stream  : ext://sys.stdout
 loggers:
     paho:
         handlers:
