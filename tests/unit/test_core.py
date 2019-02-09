@@ -9,7 +9,7 @@ import requests
 import paho.mqtt.client as paho
 
 from tavern._plugins.mqtt.client import MQTTClient
-from tavern.core import run_test
+from tavern.core import run_test, resolve_spec
 from tavern.util import exceptions
 
 
@@ -437,3 +437,59 @@ class TestFormatMQTTVarsPlain:
             run_test("heif", fulltest, includes)
 
         assert pmock.called
+
+
+class TestResolveSpec:
+    """Test resolve spec"""
+
+    def test_resolve_spec(self):
+        """ test resolve spec
+            after resolve stage, will only format the keys in variables,marks,usefixtures
+        """
+        base_spec = {
+            "name": "base spec",
+            "variables": {
+                "first_var": "123"
+            },
+            "stages": [{
+                "id": "base_stage",
+                "name": "base stage",
+                "request": {
+                    "url": "www.google.com",
+                    "json": {
+                        "test": "{first_var}"
+                    }
+                }
+            }]
+        }
+
+        ref_spec = {
+            "includes": [base_spec],
+            "variables": {
+                "first_var": "{first_var} 234",
+                "second_var": "123",
+            },
+            "stages": [{
+                "ref": "base_stage",
+                "id": "ref_stage",
+                "name": "reference stage",
+                "request": {
+                    "json": {
+                        "test2": "{second_var}"
+                    }
+                }
+            }]
+        }
+
+        final_spec = {
+            "includes": [ref_spec],
+            "stages": [{
+                "ref": "ref_stage"
+            }]
+        }
+        variables = {}
+        final_stages = resolve_spec(final_spec, variables, True)
+
+        assert list(final_stages.keys()) == ["base_stage", "ref_stage"]
+        assert final_stages["ref_stage"]["request"]['json'] == {"test":"{first_var}", "test2":"{second_var}"}
+        assert variables == {"first_var": "123 234", "second_var": "123"}

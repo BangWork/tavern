@@ -10,7 +10,7 @@ from contextlib2 import ExitStack
 from box import Box
 
 from .util import exceptions
-from .util.dict_util import format_keys
+from .util.dict_util import format_keys, deep_dict_merge
 from .util.delay import delay
 from .util.retry import retry
 
@@ -27,9 +27,8 @@ def _resolve_reference_stage(raw_stage, available_stages):
         if ref_id in available_stages:
             ref_stage = available_stages[ref_id]
             # make a copy of ref stage, which can not change the origin one
-            copy_stage = deepcopy(ref_stage)
-            copy_stage.update(raw_stage)
             logger.debug("found stage reference: %s", ref_id)
+            copy_stage = deep_dict_merge(ref_stage, raw_stage)
             return copy_stage
         else:
             logger.error(
@@ -54,12 +53,14 @@ def resolve_spec(test_spec, variables, parse_stages=True):
 
     if "includes" in test_spec:
         for included in test_spec["includes"]:
-            includedStages = resolve_spec(
+            included_stages = resolve_spec(
                 included, variables, parse_stages)
-            final_stages.update(includedStages)
+            final_stages.update(included_stages)
 
     if "variables" in test_spec:
         formatted_include = format_keys(test_spec["variables"], variables)
+        logger.debug("before format:%s,after format:%s",
+                     variables, formatted_include)
         variables.update(formatted_include)
 
     if parse_stages and "stages" in test_spec:
