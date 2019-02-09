@@ -152,7 +152,7 @@ class TestSave:
         assert saved == {
             "next_location": example_response["headers"]["location"]}
 
-    def test_save_redirect_query_param(self, example_response, example_schema, includes):
+    def test_save_redirect_query_param(self, example_schema, includes):
         """Save a key from the query parameters of the redirect location
         """
         example_schema["save"] = {
@@ -170,7 +170,7 @@ class TestSave:
         "headers",
         "redirect_query_params",
     ))
-    def test_bad_save(self, save_from, example_response, example_schema, includes):
+    def test_bad_save(self, save_from, example_schema, includes):
         key = "{}.123".format(save_from)
 
         example_schema["save"] = {"abc": "{%s}" % key}
@@ -376,6 +376,52 @@ class TestMatchStatusCodes:
         r._check_status_code(103, {})
 
         assert r.errors
+
+
+class TestNestedValidate:
+
+    def test_validate_nested_anything(self, example_response, example_schema, includes):
+        """Check that nested 'anything' comparisons work
+
+        This is a bit hacky because we're directly checking the ANYTHING
+        comparison - need to add an integration test too
+        """
+
+        example_response["body"] = {
+            "nested": {
+                "subthing": "blabla",
+            }
+        }
+        includes["variables"]["body"] = example_response["body"]
+        validate_block = [
+            {"eq": ["{body.nested}", {"subthing": ANYTHING}]}
+        ]
+
+        r = RestResponse(Mock(), "Test 1", example_schema, includes)
+
+        r._validate_block(validate_block)
+        includes["variables"].pop("body")
+        assert not r.errors
+
+    def test_validate_with_strict_key_check(self, example_response, example_schema, includes):
+        example_response["body"] = {
+            "nested": {
+                "subthing": "blabla",
+            }
+        }
+        includes["variables"]["body"] = example_response["body"]
+        validate_block = [
+            {"eq": ["{body.nested.subthing}", ANYTHING, {"strict": True}]}
+        ]
+
+        r = RestResponse(Mock(), "Test 1", example_schema, includes)
+
+        with patch("tavern.util.built_in.equals", return_value=True) as pmock:
+            r._validate_block(validate_block)
+
+        pmock.assert_called_with("blabla", ANYTHING, strict=True)
+        includes["variables"].pop("body")
+        assert not r.errors
 
 
 class TestFull:

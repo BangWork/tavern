@@ -1,15 +1,16 @@
 from textwrap import dedent
+from mock import Mock, patch
 from collections import OrderedDict
 
 import pytest
 import yaml
 import copy
+from builtins import str as ustr
 
 from tavern.schemas.extensions import validate_extensions, validate_block
 from tavern.util import exceptions
 from tavern.util.loader import ANYTHING, IncludeLoader
 from tavern.util.dict_util import deep_dict_merge, check_keys_match_recursive, format_keys
-from tavern.util.built_in import equals
 
 
 class TestValidateFunctions:
@@ -23,6 +24,19 @@ class TestValidateFunctions:
         spec = {
             "$ext": {
                 "function": "operator:add",
+            }
+        }
+
+        validate_extensions(spec, None, None)
+
+    def test_get_built_in_extension(self):
+        """Loads tavern built in extention function
+        """
+
+        spec = {
+            '$ext': {
+                "function": "random_string",
+                "extra_args": [4]
             }
         }
 
@@ -464,6 +478,42 @@ class TestCustomTokens:
 
 
 class TestFormatKeys:
+    def test_format_with_extention(self):
+        to_format = {
+            "a": {
+                "$ext": {
+                    "function": "random_string",
+                    "extra_args": ["{number}", "{str}"],
+                    "extra_kwargs": {
+                        "num": "{number}"
+                    }
+                }
+            },
+            "b": {
+                "$ext": {
+                    "function": "os:custom_function",
+                    "extra_args": ["{number}", "{str}"],
+                    "extra_kwargs": {
+                        "str": "{str}"
+                    }
+                }
+            }
+        }
+        format_variables = {
+            "number": 4,
+            "str": "123"
+        }
+
+        final_value = "abcd"
+
+        with patch("tavern.util.built_in.random_string", return_value=final_value) as pmock:
+            with patch("os.custom_function", return_value=final_value, create=True) as pmock_custom:
+                formatted_value = format_keys(to_format, format_variables)
+                assert formatted_value["a"] == final_value
+                assert formatted_value["b"] == final_value
+
+        pmock.assert_called_with(4, "123", num=4)
+        pmock_custom.assert_called_with(4, "123", str="123")
 
     def test_format_missing_raises(self):
         to_format = {
@@ -473,23 +523,51 @@ class TestFormatKeys:
         with pytest.raises(exceptions.MissingFormatError):
             format_keys(to_format, {})
 
+    def test_format_with_built_in_import_missing_raises(self):
+        to_format = {
+            "a": {
+                "$ext": {
+                    "function": "not_exist_built_in"
+                }
+            }
+        }
+        with pytest.raises(exceptions.InvalidExtFunctionError):
+            format_keys(to_format, {})
+
+    def test_format_with_extension_import_missing_raises(self):
+        to_format = {
+            "a": {
+                "$ext": {
+                    "function": "os:not_exist"
+                }
+            }
+        }
+        with pytest.raises(exceptions.InvalidExtFunctionError):
+            format_keys(to_format, {})
+
     def test_format_success(self):
         to_format = {
-            "a": "{b}",
+            "a1": "{b}",
+            "a2": "this is {b.formatted}",
+            "a3": "{b.formatted}",
+            "a4": "{b.formatted_bool}",
+            "a5": "this is {b.formatted_bool}",
+            "a6": "this is {b}"
         }
 
-        final_value = "formatted"
+        final_value = {
+            "formatted": 1,
+            "formatted_bool": True
+        }
 
         format_variables = {
-            "b": final_value,
+            "b": final_value
         }
+        formatted_value = format_keys(to_format, format_variables)
 
-        assert format_keys(to_format, format_variables)["a"] == final_value
-
-
-class TestComparators:
-    def test_deep_diff(self):
-        a1 = {"a": 1}
-        a2 = {"a": 2}
-        with pytest.raises(AssertionError):
-            equals(a1, a2)
+        assert formatted_value["a1"] == final_value
+        assert formatted_value["a2"] == "this is 1"
+        assert formatted_value["a3"] == 1
+        assert formatted_value["a4"]
+        assert formatted_value["a5"] == "this is True"
+        assert formatted_value["a6"] == "this is {'formatted': 1, 'formatted_bool': True}"

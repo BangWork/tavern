@@ -266,16 +266,6 @@ class BoolToken(TypeConvertToken):
     constructor = StrToBoolConstructor
 
 
-class DictToken(TypeConvertToken):
-    yaml_tag = "!dict"
-    constructor = dict
-
-
-class TupleToken(TypeConvertToken):
-    yaml_tag = "!tuple"
-    constructor = tuple
-
-
 class StrToRawConstructor(object):
     """Used when we want to ignore brace formatting syntax"""
 

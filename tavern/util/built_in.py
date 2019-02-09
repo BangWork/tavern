@@ -1,7 +1,8 @@
 import re
 import logging
 import random
-from tavern.util.compat import basestring, builtin_str, integer_types
+from .compat import basestring, builtin_str, integer_types
+from .dict_util import check_keys_match_recursive
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +12,7 @@ def random_string(num=8, checked=""):
     salt = []
     for _ in range(num):
         salt.append(random.choice(seed))
-    random_string = checked + ''.join(salt)
-    return random_string
+    return checked + ''.join(salt)
 
 
 def uuid(checked=""):
@@ -20,26 +20,8 @@ def uuid(checked=""):
 
 
 # comparator
-def equals(check_value, expect_value):
-    if isinstance(check_value, dict):
-        assert isinstance(expect_value, dict), "type not equal: '{}' != '{}'".format(
-            check_value, expect_value)
-
-        for key in check_value:
-            assert key in expect_value, "key not equal:'{}' != '{}'".format(
-                check_value, expect_value)
-            equals(check_value[key], expect_value[key])
-    elif isinstance(check_value, (list, tuple)):
-        assert isinstance(expect_value, (list, tuple)), "type not equal: '{}' != '{}'".format(
-            check_value, expect_value)
-        assert len(check_value) == len(expect_value), "list length not equal:'{}' != '{}'".format(
-            check_value, expect_value)
-
-        for index, _ in enumerate(check_value):
-            equals(check_value[index], expect_value[index])
-    else:
-        assert check_value == expect_value, "value '{}' != '{}'".format(
-            check_value, expect_value)
+def equals(check_value, expect_value, **kwargs):
+    check_keys_match_recursive(expect_value, check_value, [], **kwargs)
 
 
 def less_than(check_value, expect_value):

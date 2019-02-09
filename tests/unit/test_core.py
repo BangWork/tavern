@@ -135,6 +135,38 @@ class TestRunStages:
         args, kwargs = pmock.call_args_list[1]
         assert kwargs["url"] == "http://www.google.com"
 
+    def test_recurse_external_stage(self, fulltest, mockargs, includes):
+        """ Successfully load and run stage ref from the includes
+        """
+
+        mock_response = Mock(**mockargs)
+
+        newtest = deepcopy(fulltest)
+        newtest["includes"] = [{
+            "includes": [deepcopy(includes)],
+            "variable":{
+                "new_prefix": "{request.prefix}.abc"
+            },
+            "stages": [{
+                "id": "new_ref_stage",
+                "ref": "my_external_stage"
+            }]
+        }]
+        newtest["stages"].insert(
+            0, {"ref": "new_ref_stage"})
+        with patch("tavern._plugins.rest.request.requests.Session.request", return_value=mock_response) as pmock:
+            run_test("heif", newtest, includes)
+
+        assert pmock.called
+
+        # We expect 2 calls, first to bing (external stage),
+        # then google (part of fulltest)
+        assert len(pmock.call_args_list) == 2
+        args, kwargs = pmock.call_args_list[0]
+        assert kwargs["url"] == "http://www.bing.com"
+        args, kwargs = pmock.call_args_list[1]
+        assert kwargs["url"] == "http://www.google.com"
+
 
 class TestRetry:
 

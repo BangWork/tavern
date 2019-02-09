@@ -73,7 +73,7 @@ def format_keys(val, variables):
         # formatted = {key: format_keys(val[key], box_vars) for key in val}
         # format_keys 增加了对于 yaml 中 dict 类型中包含 $ext 关键字的解析
         if "$ext" in val:
-            run_ext_function(val["$ext"], variables)
+            formatted = run_ext_function(val["$ext"], variables)
         else:
             formatted = {}
             for key in val:

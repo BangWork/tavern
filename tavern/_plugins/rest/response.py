@@ -238,7 +238,12 @@ class RestResponse(BaseResponse):
                             try:
                                 formatted_validate_args = format_keys(
                                     validator_args, self.test_block_config["variables"])
-                                comparator(*formatted_validate_args)
+
+                                kwargs = {}
+                                if len(formatted_validate_args) > 2:
+                                    kwargs = formatted_validate_args.pop()
+
+                                comparator(*formatted_validate_args, **kwargs)
                             except Exception as e:  # pylint: disable=broad-except
                                 self._adderr("Error calling comparator function '%s':\n%s",
                                              comparator_str,
