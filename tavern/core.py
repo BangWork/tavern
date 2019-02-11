@@ -202,7 +202,7 @@ def run_stage(sessions, stage, test_block_config):
     delay(stage, "after")
 
 
-def _run_pytest(in_file, tavern_global_cfg, tavern_mqtt_backend=None, tavern_http_backend=None, tavern_strict=None, pytest_args=None, **kwargs):  # pylint: disable=too-many-arguments
+def _run_pytest(in_file, tavern_global_cfg, tavern_mqtt_backend=None, tavern_http_backend=None, tavern_strict=None, tavern_function_arg=None, pytest_args=None, **kwargs):  # pylint: disable=too-many-arguments
     """Run all tests contained in a file using pytest.main()
 
     Args:
@@ -236,6 +236,8 @@ def _run_pytest(in_file, tavern_global_cfg, tavern_mqtt_backend=None, tavern_htt
         if tavern_global_cfg:
             pytest_args += ["--tavern-global-cfg", global_filename]
 
+        if tavern_function_arg:
+            pytest_args += ["--tavern-function-cfg", tavern_function_arg]
         if tavern_mqtt_backend:
             pytest_args += ["--tavern-mqtt-backend", tavern_mqtt_backend]
         if tavern_http_backend:

@@ -18,8 +18,9 @@ from box import Box
 from tavern.core import run_test, resolve_spec, initializa_environ_variables
 from tavern.plugins import load_plugins
 from tavern.schemas.files import verify_tests
+from tavern.schemas.extensions import import_ext_function
 from tavern.util import exceptions
-from tavern.util.dict_util import format_keys
+from tavern.util.dict_util import format_keys, deep_dict_merge
 from tavern.util.general import load_global_config
 from tavern.util.loader import IncludeLoader
 
@@ -75,6 +76,12 @@ def add_parser_options(parser_addoption, with_defaults=True):
         default=False,
         action="store_true",
     )
+    parser_addoption(
+        "--tavern-function-cfg",
+        help="One or more functions to get configuration to include in every test",
+        required=False,
+        nargs="+"
+    )
 
 
 def pytest_addoption(parser):
@@ -109,6 +116,12 @@ def pytest_addoption(parser):
         help="Use new traceback style (beta)",
         type="bool",
         default=False,
+    )
+    parser.addini(
+        "tavern-function-cfg",
+        help="One or more functions to get configuration to include in every test",
+        type="linelist",
+        default=[]
     )
 
 
@@ -374,6 +387,20 @@ class YamlItem(pytest.Item):
 
             self.add_marker(pm)
 
+    def _run_cfg_hooks(self, hooks, variables):
+        cfg_after_hooks = {}
+        for hook in hooks:
+            hook_fn = import_ext_function(hook)
+            try:
+                hooked_variables = hook_fn(self.config, variables)
+            except Exception as e:  # pylint: disable=broad-except
+                raise_from(exceptions.CallExtFunctionError(
+                    "Error calling hook functions {}".format(hook)), e)
+            else:
+                cfg_after_hooks = deep_dict_merge(
+                    cfg_after_hooks, hooked_variables)
+        return cfg_after_hooks
+
     def _parse_arguments(self):
         # Load ini first
         ini_global_cfg_paths = self.config.getini("tavern-global-cfg") or []
@@ -396,6 +423,22 @@ class YamlItem(pytest.Item):
             })
 
             global_cfg["variables"] = format_keys(loaded_variables, tavern_box)
+
+        # Load hook module in ini
+        ini_function_cfgs = self.config.getini(
+            "tavern-function-cfg") or []
+
+        # Load hook module in command line
+        cmdline_function_cfgs = self.config.getoption(
+            "tavern-function-cfg") or []
+
+        all_function_cfgs = set(ini_function_cfgs + cmdline_function_cfgs)
+
+        function_cfgs = self._run_cfg_hooks(
+            all_function_cfgs, global_cfg)
+
+        global_cfg = deep_dict_merge(
+            global_cfg, function_cfgs)
 
         if self.config.getini("tavern-strict") is not None:
             strict = self.config.getini("tavern-strict")
