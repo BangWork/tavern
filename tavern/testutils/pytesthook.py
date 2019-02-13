@@ -430,7 +430,7 @@ class YamlItem(pytest.Item):
 
         # Load hook module in command line
         cmdline_function_cfgs = self.config.getoption(
-            "tavern-function-cfg") or []
+            "tavern_function_cfg") or []
 
         all_function_cfgs = set(ini_function_cfgs + cmdline_function_cfgs)
 
