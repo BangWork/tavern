@@ -110,7 +110,7 @@ class IncludeLoader(Reader, Scanner, Parser, RememberComposer, Resolver,
             self._root = os.path.split(stream.name)[0]
         except AttributeError:
             self._root = os.path.curdir
-
+        logger.debug("root is:%s", self._root)
         Reader.__init__(self, stream)
         Scanner.__init__(self)
         Parser.__init__(self)

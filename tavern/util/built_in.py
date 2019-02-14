@@ -7,11 +7,19 @@ from .dict_util import check_keys_match_recursive
 logger = logging.getLogger(__name__)
 
 
-def random_string(num=8, checked=""):
-    seed = "0123456789AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz"
+def random_string(length=8, checked="", has_number=True, has_upcase=True, has_lowercase=True):
+    seed = []
+    if has_number:
+        seed.append("0123456789")
+    if has_upcase:
+        seed.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    if has_lowercase:
+        seed.append("abcdefghijklmnopqrstuvwxyz")
+
+    seed_str = "".join(seed)
     salt = []
-    for _ in range(num):
-        salt.append(random.choice(seed))
+    for _ in range(length):
+        salt.append(random.choice(seed_str))
     return checked + ''.join(salt)
 
 

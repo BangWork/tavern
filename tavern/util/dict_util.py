@@ -17,18 +17,16 @@ from . import exceptions
 logger = logging.getLogger(__name__)
 
 
-def run_ext_function(ext, variables, *args, **kwargs):
+def run_ext_function(ext, variables):
     formatted_ext = format_keys(ext, variables)
     ext_fn = get_wrapped_create_function(formatted_ext)
     try:
-        formatted = ext_fn(*args, **kwargs)
+        formatted = ext_fn()
     except Exception as e:  # pylint: disable=broad-except
         raise_from(exceptions.CallExtFunctionError(
             """
             Call $ext function error:
             func: {function}
-            args: {extra_args}
-            kwargs: {extra_kwargs}
             """.format(**ext)), e)
     else:
         return formatted
@@ -84,7 +82,7 @@ def format_keys(val, variables):
         try:
             formatted = format_string(val, box_vars)
         except KeyError as e:
-            logger.error("Failed to resolve string [%s] with variables [%s]",
+            logger.error("Failed to resolve string '%s' with variables '%s'",
                          val, box_vars)
             logger.error("Key(s) not found in format: %s", e.args)
             raise_from(exceptions.MissingFormatError(e.args), e)

@@ -92,8 +92,8 @@ class TestMakeFile(object):
             get_basic_parametrize_mark(),
             get_basic_parametrize_mark(),
         ]
-
-        tests = get_parametrised_tests(marks)
+        with patch("tavern.testutils.pytesthook.YamlItem"):
+            tests = get_parametrised_tests(marks)
 
         # [1, 1, 1]
         # [1, 1, 2]
@@ -109,8 +109,8 @@ class TestMakeFile(object):
             get_joined_parametrize_mark(),
             get_basic_parametrize_mark(),
         ]
-
-        tests = get_parametrised_tests(marks)
+        with patch("tavern.testutils.pytesthook.YamlItem"):
+            tests = get_parametrised_tests(marks)
 
         # [w, x, 1]
         # [w, x, 2]
@@ -126,8 +126,8 @@ class TestMakeFile(object):
             get_joined_parametrize_mark(),
             get_basic_parametrize_mark(),
         ]
-
-        tests = get_parametrised_tests(marks)
+        with patch("tavern.testutils.pytesthook.YamlItem"):
+            tests = get_parametrised_tests(marks)
 
         # [w, x, w, x, 1]
         # [w, x, w, x, 2]
@@ -145,8 +145,8 @@ class TestMakeFile(object):
             get_basic_parametrize_mark(),
             get_basic_parametrize_mark(),
         ]
-
-        tests = get_parametrised_tests(marks)
+        with patch("tavern.testutils.pytesthook.YamlItem"):
+            tests = get_parametrised_tests(marks)
 
         # [w, x, w, x, 1, 1]
         # [w, x, w, x, 1, 2]

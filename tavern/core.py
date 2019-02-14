@@ -39,31 +39,17 @@ def _resolve_reference_stage(raw_stage, available_stages):
         return raw_stage
 
 
-def initializa_environ_variables(variables):
-    tavern_box = Box({
-        "env_vars": dict(os.environ),
-    })
-    variables["tavern"] = tavern_box
-
-
-def resolve_spec(test_spec, variables, parse_stages=True):
+def resolve_spec(test_spec):
     # Need to get a final list of stages in the tests (resolving refs)
     final_stages = {}
     # resolve stage in includes first
 
     if "includes" in test_spec:
         for included in test_spec["includes"]:
-            included_stages = resolve_spec(
-                included, variables, parse_stages)
+            included_stages = resolve_spec(included)
             final_stages.update(included_stages)
 
-    if "variables" in test_spec:
-        formatted_include = format_keys(test_spec["variables"], variables)
-        logger.debug("before format:%s,after format:%s",
-                     variables, formatted_include)
-        variables.update(formatted_include)
-
-    if parse_stages and "stages" in test_spec:
+    if "stages" in test_spec:
         for raw_stage in test_spec["stages"]:
             if "id" not in raw_stage:
                 continue
@@ -102,22 +88,14 @@ def run_test(in_file, test_spec, global_cfg):
 
     test_block_config = dict(global_cfg)
 
-    if "variables" not in test_block_config:
-        test_block_config["variables"] = {}
-
-    initializa_environ_variables(test_block_config["variables"])
-
     test_block_name = test_spec["name"]
 
     # Strict on body by default
     default_strictness = test_block_config["strict"]
 
     logger.info("Running test : %s", test_block_name)
-    logger.debug("variables:%s", json.dumps(test_block_config))
     with ExitStack() as stack:
-        final_stages = resolve_spec(
-            test_spec, test_block_config["variables"])
-
+        final_stages = resolve_spec(test_spec)
         for stage in test_spec["stages"]:
             if "ref" in stage:
                 new_stage = _resolve_reference_stage(stage, final_stages)

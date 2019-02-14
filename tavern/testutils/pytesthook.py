@@ -13,9 +13,10 @@ import yaml
 from _pytest import fixtures
 from _pytest._code.code import FormattedExcinfo
 from future.utils import raise_from
+from copy import deepcopy
 
 from box import Box
-from tavern.core import run_test, resolve_spec, initializa_environ_variables
+from tavern.core import run_test
 from tavern.plugins import load_plugins
 from tavern.schemas.files import verify_tests
 from tavern.schemas.extensions import import_ext_function
@@ -243,28 +244,21 @@ class YamlFile(pytest.File):
             # skipif: {my_integer} > 2
             # skipif: 'https' in '{hostname}'
             # skipif: '{hostname}'.contains('ignoreme')
-
-            fmt_vars = {}
-
             # intialize fmt_vars with environ variables
-            initializa_environ_variables(fmt_vars)
-
-            # resolve all variables in include and spec
-            resolve_spec(test_spec, fmt_vars, False)
 
             pytest_marks = []
 
             # This should either be a string or a skipif
             for m in marks:
                 if isinstance(m, str):
-                    m = format_keys(m, fmt_vars)
+                    m = format_keys(m, item.global_cfg["variables"])
                     pytest_marks.append(getattr(pytest.mark, m))
                 elif isinstance(m, dict):
                     for markname, extra_arg in m.items():
                         # NOTE
                         # cannot do 'skipif' and rely on a parametrized
                         # argument.
-                        extra_arg = format_keys(extra_arg, fmt_vars)
+                        extra_arg = format_keys(extra_arg, item.global_cfg["variables"])
                         pytest_marks.append(
                             getattr(pytest.mark, markname)(extra_arg))
 
@@ -335,8 +329,8 @@ class YamlItem(pytest.Item):
         super(YamlItem, self).__init__(name, parent)
         self.path = path
         self.spec = spec
-
-        self.global_cfg = {}
+        self.global_cfg = self._initialize_variables()
+        self._resolve_variables(self.spec)
 
     def initialise_fixture_attrs(self):
         # pylint: disable=protected-access,attribute-defined-outside-init
@@ -400,6 +394,27 @@ class YamlItem(pytest.Item):
                 cfg_after_hooks = deep_dict_merge(
                     cfg_after_hooks, hooked_variables)
         return cfg_after_hooks
+
+    def _initialize_variables(self):
+        global_cfg = self._parse_arguments()
+        global_cfg.setdefault("variables", {})
+        tavern_box = Box({
+            "env_vars": dict(os.environ),
+        })
+        global_cfg["variables"]["tavern"] = tavern_box
+        return global_cfg
+
+    def _resolve_variables(self, test_spec):
+
+        if "includes" in test_spec:
+            for included in test_spec["includes"]:
+                self._resolve_variables(included)
+
+        if "variables" in test_spec:
+            formatted_include = format_keys(
+                test_spec["variables"], self.global_cfg["variables"])
+            self.global_cfg["variables"] = deep_dict_merge(
+                self.global_cfg["variables"], formatted_include)
 
     def _parse_arguments(self):
         # Load ini first
@@ -495,11 +510,11 @@ class YamlItem(pytest.Item):
         return values
 
     def runtest(self):
-        self.global_cfg = self._parse_arguments()
+        global_cfg = deepcopy(self.global_cfg)
 
-        self.global_cfg.setdefault("variables", {})
+        global_cfg.setdefault("variables", {})
 
-        load_plugins(self.global_cfg)
+        load_plugins(global_cfg)
 
         # INTERNAL
         # NOTE - now that we can 'mark' tests, we could use pytest.mark.xfail
@@ -511,9 +526,9 @@ class YamlItem(pytest.Item):
             verify_tests(self.spec)
 
             fixture_values = self._load_fixture_values()
-            self.global_cfg["variables"].update(fixture_values)
+            global_cfg["variables"].update(fixture_values)
 
-            run_test(self.path, self.spec, self.global_cfg)
+            run_test(self.path, self.spec, global_cfg)
         except exceptions.BadSchemaError:
             if xfail == "verify":
                 logger.info("xfailing test while verifying schema")

@@ -3,6 +3,7 @@ import uuid
 import os
 from mock import patch, Mock, MagicMock
 from copy import deepcopy
+from box import Box
 
 import pytest
 import requests
@@ -251,7 +252,11 @@ class TestTavernMetaFormat:
 
         with patch("tavern._plugins.rest.request.requests.Session.request", return_value=mock_response) as pmock:
             with patch.dict(os.environ, {env_key: "bleuihg"}):
+                includes["variables"]["tavern"] = Box({
+                    "env_vars": dict(os.environ),
+                })
                 run_test("heif", fulltest, includes)
+                includes["variables"].pop("tavern")
 
         assert pmock.called
 
@@ -264,7 +269,11 @@ class TestTavernMetaFormat:
             "a_format_key": "{tavern.env_vars.%s}" % env_key}
 
         with pytest.raises(exceptions.MissingFormatError):
+            includes["variables"]["tavern"] = Box({
+                "env_vars": dict(os.environ),
+            })
             run_test("heif", fulltest, includes)
+            includes["variables"].pop("tavern")
 
 
 class TestFormatRequestVars:
@@ -448,9 +457,6 @@ class TestResolveSpec:
         """
         base_spec = {
             "name": "base spec",
-            "variables": {
-                "first_var": "123"
-            },
             "stages": [{
                 "id": "base_stage",
                 "name": "base stage",
@@ -465,10 +471,6 @@ class TestResolveSpec:
 
         ref_spec = {
             "includes": [base_spec],
-            "variables": {
-                "first_var": "{first_var} 234",
-                "second_var": "123",
-            },
             "stages": [{
                 "ref": "base_stage",
                 "id": "ref_stage",
@@ -487,9 +489,8 @@ class TestResolveSpec:
                 "ref": "ref_stage"
             }]
         }
-        variables = {}
-        final_stages = resolve_spec(final_spec, variables, True)
+        final_stages = resolve_spec(final_spec)
 
         assert list(final_stages.keys()) == ["base_stage", "ref_stage"]
-        assert final_stages["ref_stage"]["request"]['json'] == {"test":"{first_var}", "test2":"{second_var}"}
-        assert variables == {"first_var": "123 234", "second_var": "123"}
+        assert final_stages["ref_stage"]["request"]['json'] == {
+            "test": "{first_var}", "test2": "{second_var}"}

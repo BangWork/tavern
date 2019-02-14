@@ -204,16 +204,27 @@ schema;stage_ref:
     ref:
       required: true
       type: str
+schema;variables:
+  type: map
+  required: false
+  mapping:
+    re;(.*):
+      type: any
 
-type: map
-mapping:
-  name:
-    required: true
-    type: str
-  description:
-    required: false
-    type: str
-  marks:
+schema;stages:
+  type: seq
+  required: true
+  sequence:
+    - include: stage
+    - include: stage_ref
+
+schema;xfail:
+  type: str
+  enum:
+    - verify
+    - run
+
+schema;marks:
     type: seq
     matching: "any"
     sequence:
@@ -255,44 +266,55 @@ mapping:
                       - type: int
                       - type: float
 
-  _xfail:
-    type: str
-    enum:
-      - verify
-      - run
+schema;include_stage:
+  required: false
+  type: seq
+  sequence:
+    - type: map
+      mapping:
+        name:
+          required: true
+          type: str
+        description:
+          required: false
+          type: str
+        _xfail:
+          include: xfail
+        marks:
+          include: marks
+        strict:
+          func: check_strict_key
+          type: any
+        includes:
+          include: include_stage
+        variables:
+          include: variables
+        stages:
+          type: seq
+          required: false
+          sequence:
+            - include: stage
+            - include: stage_ref
 
+type: map
+mapping:
+  name:
+    required: true
+    type: str
+  description:
+    required: false
+    type: str
+  _xfail:
+    include: xfail
+  marks:
+    include: marks
   strict:
     func: check_strict_key
     type: any
-
   includes:
-    required: false
-    type: seq
-    sequence:
-      - type: map
-        required: false
-        mapping:
-          name:
-            required: true
-            type: str
-
-          description:
-            required: true
-            type: str
-
-          variables:
-            type: map
-            required: false
-            mapping:
-              re;(.*):
-                type: any
-
-          stages:
-            type: seq
-            required: false
-            sequence:
-              - include: stage
-
+    include: include_stage
+  variables:
+    include: variables
   stages:
     type: seq
     required: true
