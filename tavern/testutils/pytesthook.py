@@ -258,7 +258,8 @@ class YamlFile(pytest.File):
                         # NOTE
                         # cannot do 'skipif' and rely on a parametrized
                         # argument.
-                        extra_arg = format_keys(extra_arg, item.global_cfg["variables"])
+                        extra_arg = format_keys(
+                            extra_arg, item.global_cfg["variables"])
                         pytest_marks.append(
                             getattr(pytest.mark, markname)(extra_arg))
 
