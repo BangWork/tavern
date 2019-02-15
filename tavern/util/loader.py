@@ -5,8 +5,9 @@ import logging
 import uuid
 import os.path
 import pytest
-from future.utils import raise_from
 from builtins import str as ustr
+from future.utils import raise_from
+
 
 import yaml
 from yaml.reader import Reader
@@ -101,16 +102,15 @@ class IncludeLoader(Reader, Scanner, Parser, RememberComposer, Resolver,
     """YAML Loader with `!include` constructor and which can remember anchors
     between documents"""
 
-    def __init__(self, stream):
+    def __init__(self, stream, base_dir=None):
         """Initialise Loader."""
 
         # pylint: disable=non-parent-init-called
-
+        self._base_dir = base_dir
         try:
             self._root = os.path.split(stream.name)[0]
         except AttributeError:
             self._root = os.path.curdir
-        logger.debug("root is:%s", self._root)
         Reader.__init__(self, stream)
         Scanner.__init__(self)
         Parser.__init__(self)
@@ -122,18 +122,35 @@ class IncludeLoader(Reader, Scanner, Parser, RememberComposer, Resolver,
 
 def construct_include(loader, node):
     """Include file referenced at node."""
-
     # pylint: disable=protected-access
-    filename = os.path.abspath(os.path.join(
-        loader._root, loader.construct_scalar(node)
-    ))
-    extension = os.path.splitext(filename)[1].lstrip('.')
+    filename = loader.construct_scalar(node)
 
+    extension = os.path.splitext(filename)[1].lstrip('.')
     if extension not in ('yaml', 'yml'):
         raise BadSchemaError("Unknown filetype '{}'".format(filename))
 
+    if filename.startswith("/"):
+        if not os.path.exists(filename) and loader._base_dir is not None:
+            abs_path = os.path.join(loader._base_dir, filename[1:])
+            logger.debug("absolute path base on loader._base_dir:%s", abs_path)
+            if os.path.exists(abs_path):
+                filename = abs_path
+            else:
+                raise BadSchemaError(
+                    "Unreachable absolute path base on base_dir,'{}'".format(
+                        abs_path)
+                )
+        else:
+            raise BadSchemaError(
+                "Unreachable absolute path '{}'".format(filename))
+    else:
+        filename = os.path.abspath(os.path.join(loader._root, filename))
+
+    def get_loader(stream):
+        return IncludeLoader(stream, loader._base_dir)
+
     with open(filename, 'r') as f:
-        return yaml.load(f, IncludeLoader)
+        return yaml.load(f, get_loader)
 
 
 IncludeLoader.add_constructor("!include", construct_include)

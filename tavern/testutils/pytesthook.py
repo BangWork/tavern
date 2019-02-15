@@ -6,6 +6,8 @@ import os
 import re
 from builtins import str as ustr
 
+
+from copy import deepcopy
 import attr
 import py
 import pytest
@@ -13,7 +15,7 @@ import yaml
 from _pytest import fixtures
 from _pytest._code.code import FormattedExcinfo
 from future.utils import raise_from
-from copy import deepcopy
+
 
 from box import Box
 from tavern.core import run_test
@@ -83,6 +85,12 @@ def add_parser_options(parser_addoption, with_defaults=True):
         required=False,
         nargs="+"
     )
+    parser_addoption(
+        "--tavern-base-dir",
+        help="Base dir for tavern test case to include test case",
+        required=False,
+        default=None
+    )
 
 
 def pytest_addoption(parser):
@@ -124,7 +132,11 @@ def pytest_addoption(parser):
         type="linelist",
         default=[]
     )
-
+    parser.addini(
+        "tavern-base-dir",
+        help="Base dir for tavern test case to include test case",
+        default=None
+    )
 
 # @pytest.mark.hookwrapper
 # def pytest_runtest_makereport(item):
@@ -293,8 +305,22 @@ class YamlFile(pytest.File):
 
         try:
             # Convert to a list so we can catch parser exceptions
+            logger.debug("self.fspath:%s", self.fspath)
+
+            def loader(stream):
+                base_dir = self.config.getoption("tavern_base_dir")
+                if base_dir is None:
+                    base_dir = self.config.getini("tavern-base-dir")
+
+                if base_dir is not None:
+                    base_dir = os.path.join(self.config.rootdir, base_dir)
+                else:
+                    base_dir = self.config.rootdir
+
+                return IncludeLoader(stream, base_dir)
+
             all_tests = list(yaml.load_all(self.fspath.open(
-                encoding="utf-8"), Loader=IncludeLoader))
+                encoding="utf-8"), Loader=loader))
         except yaml.parser.ParserError as e:
             raise_from(exceptions.BadSchemaError, e)
 
