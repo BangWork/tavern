@@ -8,7 +8,7 @@ except ImportError:
     from urlparse import urlparse, parse_qs  # type: ignore
 
 from tavern.schemas.extensions import get_wrapped_response_function, import_ext_function
-from tavern.util.dict_util import deep_dict_merge, format_keys, recurse_set_value, recurse_access_key
+from tavern.util.dict_util import deep_dict_merge, format_keys, recurse_set_value
 from tavern.util.exceptions import TestFailError, InvalidBuildInComparatorError
 from tavern.util.comparator_util import get_uniform_comparator
 from tavern.response.base import BaseResponse, indent_err_text
@@ -74,7 +74,7 @@ class RestResponse(BaseResponse):
                         to_log += "\n  {}: {}".format(k, v)
                 else:
                     to_log += "\n {}".format(block)
-                logger.debug(to_log)
+                logger.info(to_log)
 
         log_dict_block(response.headers, "Headers")
 
@@ -116,7 +116,7 @@ class RestResponse(BaseResponse):
                 (isinstance(expected_code, list) and (status_code in expected_code)):
             logger.debug("Status code '%s' matched expected '%s'",
                          status_code, expected_code)
-            return
+            return True
         else:
             if 400 <= status_code < 500:
                 # special case if there was a bad request. This assumes that the
@@ -129,6 +129,8 @@ class RestResponse(BaseResponse):
             else:
                 self._adderr("Status code was %s, expected %s",
                              status_code, expected_code)
+
+            return False
 
     def verify(self, response):
         """Verify response against expected values and returns any values that
@@ -167,7 +169,8 @@ class RestResponse(BaseResponse):
         self.test_block_config["variables"].update(
             headers=response.headers)
 
-        self._check_status_code(response.status_code, body)
+        is_status_code_expected = self._check_status_code(
+            response.status_code, body)
 
         # 校验 cookie 值
         expected_cookies = format_keys(self.expected.get(
@@ -189,12 +192,14 @@ class RestResponse(BaseResponse):
 
         # Get any keys to save
         saved = {}
-        if "save" in self.expected:
-            saved = self._save_value(self.expected["save"])
 
-        # Do Validation
-        if "validate" in self.expected:
-            self._validate_block(self.expected["validate"])
+        if is_status_code_expected:
+            if "save" in self.expected:
+                saved = self._save_value(self.expected["save"])
+
+            # Do Validation
+            if "validate" in self.expected:
+                self._validate_block(self.expected["validate"])
 
         if self.errors:
             raise TestFailError("Test '{:s}' failed:\n{:s}".format(

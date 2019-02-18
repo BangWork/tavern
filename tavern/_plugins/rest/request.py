@@ -197,7 +197,7 @@ class RestRequest(BaseRequest):
 
         request_args = get_request_args(rspec, test_block_config)
 
-        logger.debug("Request args: %s", request_args)
+        logger.info("Request args: %s", request_args)
 
         request_args.update(allow_redirects=False)
 
