@@ -311,11 +311,11 @@ class YamlFile(pytest.File):
                 base_dir = self.config.getoption("tavern_base_dir")
                 if base_dir is None:
                     base_dir = self.config.getini("tavern-base-dir")
-
+                rootdir = str(self.config.rootdir)
                 if base_dir is not None:
-                    base_dir = os.path.join(self.config.rootdir, base_dir)
+                    base_dir = os.path.join(rootdir, base_dir)
                 else:
-                    base_dir = self.config.rootdir
+                    base_dir = rootdir
 
                 return IncludeLoader(stream, base_dir)
 
