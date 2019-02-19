@@ -9,6 +9,7 @@ from .util import exceptions
 from .util.dict_util import deep_dict_merge
 from .util.delay import delay
 from .util.retry import retry
+from .util.run_with_times import run_with_times
 
 from .plugins import get_extra_sessions, get_request_type, get_verifiers, get_expected
 from .schemas.files import wrapfile
@@ -89,7 +90,9 @@ def run_test(in_file, test_spec, global_cfg):
     # Strict on body by default
     default_strictness = test_block_config["strict"]
 
-    logger.info("Running test : %s", test_block_name)
+    logger.info("Running %s with variables: %s",
+                test_block_name, test_block_config)
+
     with ExitStack() as stack:
         final_stages = resolve_spec(test_spec)
         for stage in test_spec["stages"]:
@@ -133,8 +136,10 @@ def run_test(in_file, test_spec, global_cfg):
 
             # Wrap run_stage with retry helpe
             run_stage_with_retries = retry(stage)(run_stage)
+            run_stage_with_times = run_with_times(
+                stage)(run_stage_with_retries)
             try:
-                run_stage_with_retries(
+                run_stage_with_times(
                     sessions, stage, test_block_config)
             except exceptions.TavernException as e:
                 e.stage = stage
