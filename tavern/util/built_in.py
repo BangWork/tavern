@@ -7,11 +7,11 @@ from .dict_util import check_keys_match_recursive
 logger = logging.getLogger(__name__)
 
 
-def random_string(length=8, checked="", has_number=True, has_upcase=True, has_lowercase=True):
+def random_string(length=8, prefix="", has_number=True, has_uppercase=True, has_lowercase=True):
     seed = []
     if has_number:
         seed.append("0123456789")
-    if has_upcase:
+    if has_uppercase:
         seed.append("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     if has_lowercase:
         seed.append("abcdefghijklmnopqrstuvwxyz")
@@ -20,11 +20,11 @@ def random_string(length=8, checked="", has_number=True, has_upcase=True, has_lo
     salt = []
     for _ in range(length):
         salt.append(random.choice(seed_str))
-    return checked + ''.join(salt)
+    return prefix + ''.join(salt)
 
 
-def uuid(checked=""):
-    return random_string(checked=checked)
+def uuid(prefix=""):
+    return random_string(prefix=prefix)
 
 
 # comparator
