@@ -1,4 +1,5 @@
 from textwrap import dedent
+import jsonschema
 from mock import Mock, patch
 from collections import OrderedDict
 
@@ -11,6 +12,7 @@ from tavern.schemas.extensions import validate_extensions, validate_block
 from tavern.util import exceptions
 from tavern.util.loader import ANYTHING, IncludeLoader
 from tavern.util.dict_util import deep_dict_merge, check_keys_match_recursive, format_keys
+from tavern.util.built_in import unique_item_properties, jsonschema_validation
 
 
 class TestValidateFunctions:
@@ -229,6 +231,57 @@ class TestValidateBlock:
 
         with pytest.raises(exceptions.BadSchemaError):
             validate_block(spec, None, None)
+
+
+class TestComparator:
+    def test_jsonschema_validation_with_schema_object(self):
+        """ test if check_value match jsonschema
+        """
+        check_value = {"a": 1}
+        schema = {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "integer",
+                    "const": 1
+                }
+            }
+        }
+        jsonschema_validation(check_value, schema)
+
+    def test_jsonschema_validation_with_schema_object_failed(self):
+        check_value = {"a": 1}
+        schema = {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "string"
+                }
+            }
+        }
+        with pytest.raises(jsonschema.exceptions.ValidationError):
+            jsonschema_validation(check_value, schema)
+
+    def test_unique_item_properties_failed(self):
+        """ test if check_value has any item has duplicate value of key
+        """
+        check_value = [{"a": 1, "b": 3}, {"a": 1, "b": 2}]
+
+        with pytest.raises(AssertionError):
+            unique_item_properties(check_value, "a")
+
+    def test_unique_item_properties_success(self):
+        check_value = [{"a": 1, "b": 3}, {"a": 2, "b": 2}]
+        unique_item_properties(check_value, "a")
+
+    def test_unique_item_properties_bad_check_value(self):
+        bad_value1 = {}
+        bad_value2 = ["1"]
+        with pytest.raises(AssertionError):
+            unique_item_properties(bad_value1, "a")
+
+        with pytest.raises(AssertionError):
+            unique_item_properties(bad_value2, "a")
 
 
 class TestDictMerge:

@@ -7,10 +7,10 @@ try:
 except ImportError:
     from urlparse import urlparse, parse_qs  # type: ignore
 
-from tavern.schemas.extensions import get_wrapped_response_function, import_ext_function
+from tavern.schemas.extensions import get_wrapped_response_function
 from tavern.util.dict_util import deep_dict_merge, format_keys, recurse_set_value
-from tavern.util.exceptions import TestFailError, InvalidBuildInComparatorError
-from tavern.util.comparator_util import get_uniform_comparator
+from tavern.util.exceptions import TestFailError
+from tavern.util.comparator_util import comparators
 from tavern.response.base import BaseResponse, indent_err_text
 
 logger = logging.getLogger(__name__)
@@ -227,35 +227,31 @@ class RestResponse(BaseResponse):
                                      indent_err_text(traceback.format_exc()),
                                      e=e)
                 else:
+
                     try:
-                        comparator_str = get_uniform_comparator(key)
-                    except InvalidBuildInComparatorError as e:
-                        self._adderr("Comparator '%s' is not valid", key, e=e)
+                        comparator = comparators.get_comparator(key)
+                    except Exception as e:  # pylint: disable=broad-except
+                        self._adderr("Error getting comparator function '%s'".format,
+                                     key,
+                                     e=e
+                                     )
                     else:
                         try:
-                            comparator = import_ext_function(comparator_str)
+                            formatted_validate_args = format_keys(
+                                validator_args, self.test_block_config["variables"])
+
+                            kwargs = {}
+                            if len(formatted_validate_args) > 2:
+                                kwargs = formatted_validate_args.pop()
+
+                            comparator(*formatted_validate_args, **kwargs)
                         except Exception as e:  # pylint: disable=broad-except
-                            self._adderr("Error importing comparator function '%s'".format,
-                                         comparator_str,
+                            self._adderr("Error calling comparator function '%s':\n%s",
+                                         key,
+                                         indent_err_text(
+                                             traceback.format_exc()),
                                          e=e
                                          )
-                        else:
-                            try:
-                                formatted_validate_args = format_keys(
-                                    validator_args, self.test_block_config["variables"])
-
-                                kwargs = {}
-                                if len(formatted_validate_args) > 2:
-                                    kwargs = formatted_validate_args.pop()
-
-                                comparator(*formatted_validate_args, **kwargs)
-                            except Exception as e:  # pylint: disable=broad-except
-                                self._adderr("Error calling comparator function '%s':\n%s",
-                                             comparator_str,
-                                             indent_err_text(
-                                                 traceback.format_exc()),
-                                             e=e
-                                             )
 
     def _save_value(self, save_block):
         """Save a value in the response for use in future tests

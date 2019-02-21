@@ -97,9 +97,25 @@ class InvalidBuildInComparatorError(TavernException):
     """Invalid build in comparator"""
 
 
+class DuplicateAliasError(TavernException):
+    """comparator has same alias"""
+
+
+class InvalidAliasTypeError(TavernException):
+    """comparator alias type is not valid"""
+
+
 class InvalidTypeToConvertError(TavernException):
     """Invalid type for type convert"""
 
 
 class CallExtFunctionError(TavernException):
     """ call $ext function error """
+
+
+class ImportSetupFunctionError(TavernException):
+    """ Import setup function error """
+
+
+class CallSetupFunctionError(TavernException):
+    """ Call setup function error """

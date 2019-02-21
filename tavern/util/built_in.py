@@ -3,6 +3,7 @@ import logging
 import random
 from .compat import basestring, builtin_str, integer_types
 from .dict_util import check_keys_match_recursive
+from .json_schema_validate import jsonschema_validator
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,29 @@ def uuid(prefix=""):
 
 
 # comparator
+def jsonschema_validation(check_value, schema):
+    jsonschema_validator.validate(check_value, schema)
+
+
+def unique_item_properties(check_value, keys_or_indexs):
+    assert isinstance(
+        check_value, (list, tuple)), "Check value for unique_item_properties must be list or tuple, value is: %s" % check_value
+    if not isinstance(keys_or_indexs, (list, tuple)):
+        keys_or_indexs = [keys_or_indexs]
+    exist = {}
+    for index, item in enumerate(check_value):
+        assert isinstance(item, (dict, list, tuple)
+                          ), "item in Check value for unique_item_properties must be collection,value is: {},index is: {}".format(item, index)
+
+        for key_or_index in keys_or_indexs:
+            value = item[key_or_index]
+            if key_or_index not in exist:
+                exist[key_or_index] = {value: index}
+            else:
+                assert value not in exist[key_or_index], "Found duplicate value, index is {} - {}".format(
+                    exist[key_or_index][value], index)
+
+
 def equals(check_value, expect_value, **kwargs):
     check_keys_match_recursive(expect_value, check_value, [], **kwargs)
 

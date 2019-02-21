@@ -21,7 +21,7 @@ from box import Box
 from tavern.core import run_test
 from tavern.plugins import load_plugins
 from tavern.schemas.files import verify_tests
-from tavern.schemas.extensions import import_ext_function
+from tavern.util.import_util import import_ext_function
 from tavern.util import exceptions
 from tavern.util.dict_util import format_keys, deep_dict_merge
 from tavern.util.general import load_global_config
@@ -30,6 +30,27 @@ from tavern.util.loader import IncludeLoader
 logger = logging.getLogger(__name__)
 
 match_tavern_file = re.compile(r'^stage_.+\.ya?ml$|^stage_.+\.json$').match
+
+
+def pytest_configure(config):
+    setup_function = config.getoption("tavern_setup")
+    if setup_function is None:
+        setup_function = config.getini("tavern-setup")
+
+    if setup_function is None:
+        return
+
+    try:
+        fn = import_ext_function(setup_function)
+    except Exception as e:  # pylint: disable=broad-except
+        raise_from(exceptions.ImportSetupFunctionError(
+            "Error importing setup function {}".format(setup_function)), e)
+    else:
+        try:
+            fn(config)
+        except Exception as e:  # pylint: disable=broad-except
+            raise_from(exceptions.CallSetupFunctionError(
+                "Error Running setup function {}".format(setup_function)), e)
 
 
 def pytest_collect_file(parent, path):

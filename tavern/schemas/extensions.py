@@ -1,14 +1,13 @@
 import logging
 import re
 import functools
-import importlib
 
 from future.utils import raise_from
 
 from tavern.util.exceptions import BadSchemaError
 from tavern.util.exceptions import InvalidBuildInComparatorError
-from tavern.util.comparator_util import get_uniform_comparator
-from tavern.util import exceptions
+from tavern.util.comparator_util import comparators
+from tavern.util.import_util import import_ext_function
 from tavern.util.loader import ApproxScalar
 
 
@@ -20,52 +19,6 @@ def _getlogger():
     trying to get the root logger which won't log correctly
     """
     return logging.getLogger("tavern.schemas.extensions")
-
-
-def import_ext_function(entrypoint):
-    """Given a function name in the form of a setuptools entry point, try to
-    dynamically load and return it
-
-    Args:
-        entrypoint (str): setuptools-style entrypoint in the form
-            module.submodule:function
-
-    Returns:
-        function: function loaded from entrypoint
-
-    Raises:
-        InvalidExtFunctionError: If the module or function did not exist
-    """
-    logger = _getlogger()
-
-    match = re.match(r"^(([\w_\.]+):)?([\w_]+)$", entrypoint)
-
-    if not match:
-        msg = "Expected entrypoint in the form module.submodule:function or builtin_function"
-        logger.exception(msg)
-        raise exceptions.InvalidExtFunctionError(msg)
-
-    module = match.group(2)
-    funcname = match.group(3)
-
-    if not module:
-        module = "tavern.util.built_in"
-
-    try:
-        module = importlib.import_module(module)
-    except ImportError as e:
-        msg = "Error importing module {}".format(module)
-        logger.exception(msg)
-        raise_from(exceptions.InvalidExtFunctionError(msg), e)
-
-    try:
-        function = getattr(module, funcname)
-    except AttributeError as e:
-        msg = "No function named {} in {}".format(funcname, module)
-        logger.exception(msg)
-        raise_from(exceptions.InvalidExtFunctionError(msg), e)
-
-    return function
 
 
 def validate_block(value, rule_obj, path):
@@ -93,7 +46,7 @@ def validate_block(value, rule_obj, path):
                 validate_extensions(item, None, None)
             else:
                 try:
-                    get_uniform_comparator(key)
+                    comparators.get_comparator(key)
                 except InvalidBuildInComparatorError as e:
                     raise_from(BadSchemaError(
                         "Unexpect key of {} passed to validate block item".format(key)), e)
