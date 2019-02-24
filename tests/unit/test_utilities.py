@@ -1,3 +1,4 @@
+import os
 from textwrap import dedent
 import jsonschema
 from mock import Mock, patch
@@ -528,6 +529,36 @@ class TestCustomTokens:
             str,
             '{{"query": "{{ val1 {{ val2 {{ val3 {{ val4, val5 }} }} }} }}"}}'
         )
+
+
+class TestIncludeSchemaSchemas:
+    def test_include_schema_with_link(self):
+        def get_loader(stream):
+            base_dir = os.path.dirname(os.path.realpath(__file__))
+            schema_dir = os.path.join(base_dir, "schema")
+            return IncludeLoader(stream, schema_dir)
+        text = dedent("""
+        a: !schema_link /aschema.json
+        """)
+
+        obj = yaml.load(text, Loader=get_loader)
+
+        assert obj == {"a": {"a": {"b": 1}}}
+
+    def test_include_schema(self):
+        def get_loader(stream):
+            base_dir = os.path.dirname(os.path.realpath(__file__))
+            schema_dir = os.path.join(base_dir, "schema")
+            return IncludeLoader(stream, schema_dir)
+        text = dedent("""
+        a: 
+            !schema
+            $ref: /aschema.json
+        """)
+
+        obj = yaml.load(text, Loader=get_loader)
+
+        assert obj == {"a": {"a": {"b": 1}}}
 
 
 class TestFormatKeys:

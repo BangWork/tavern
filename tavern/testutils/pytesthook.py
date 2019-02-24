@@ -6,8 +6,6 @@ import os
 import re
 from builtins import str as ustr
 
-
-from copy import deepcopy
 import attr
 import py
 import pytest
@@ -33,24 +31,24 @@ match_tavern_file = re.compile(r'^stage_.+\.ya?ml$|^stage_.+\.json$').match
 
 
 def pytest_configure(config):
-    setup_function = config.getoption("tavern_setup")
-    if setup_function is None:
-        setup_function = config.getini("tavern-setup")
+    commandline_setup_functions = config.getoption(
+        "tavern_setup_functions") or []
+    ini_setup_functions = config.getini("tavern-setup-functions") or []
 
-    if setup_function is None:
-        return
+    setup_functions = set(commandline_setup_functions + ini_setup_functions)
 
-    try:
-        fn = import_ext_function(setup_function)
-    except Exception as e:  # pylint: disable=broad-except
-        raise_from(exceptions.ImportSetupFunctionError(
-            "Error importing setup function {}".format(setup_function)), e)
-    else:
+    for setup_function in setup_functions:
         try:
-            fn(config)
+            fn = import_ext_function(setup_function)
         except Exception as e:  # pylint: disable=broad-except
-            raise_from(exceptions.CallSetupFunctionError(
-                "Error Running setup function {}".format(setup_function)), e)
+            raise_from(exceptions.ImportSetupFunctionError(
+                "Error importing setup function {}".format(setup_function)), e)
+        else:
+            try:
+                fn(config)
+            except Exception as e:  # pylint: disable=broad-except
+                raise_from(exceptions.CallSetupFunctionError(
+                    "Error Running setup function {}".format(setup_function)), e)
 
 
 def pytest_collect_file(parent, path):
@@ -112,6 +110,12 @@ def add_parser_options(parser_addoption, with_defaults=True):
         required=False,
         default=None
     )
+    parser_addoption(
+        "--tavern-setup-functions",
+        help="Initialize Tavern with config and loader",
+        required=False,
+        nargs="+"
+    )
 
 
 def pytest_addoption(parser):
@@ -157,6 +161,12 @@ def pytest_addoption(parser):
         "tavern-base-dir",
         help="Base dir for tavern test case to include test case",
         default=None
+    )
+    parser.addini(
+        "tavern-setup-functions",
+        help="Initialize Tavern with config and loader",
+        type="linelist",
+        default=[]
     )
 
 # @pytest.mark.hookwrapper
@@ -558,7 +568,7 @@ class YamlItem(pytest.Item):
         return values
 
     def runtest(self):
-        global_cfg = deepcopy(self.global_cfg)
+        global_cfg = copy.deepcopy(self.global_cfg)
 
         global_cfg.setdefault("variables", {})
 

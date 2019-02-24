@@ -6,7 +6,16 @@ import uuid
 import os.path
 import pytest
 from builtins import str as ustr
+from jsonref import JsonLoader, load_uri, JsonRef
 from future.utils import raise_from
+
+
+try:
+    from urllib import parse as urlparse
+    from urllib.request import pathname2url
+except ImportError:
+    import urlparse  # type: ignore
+    from urllib import pathname2url  # type: ignore
 
 
 import yaml
@@ -120,18 +129,10 @@ class IncludeLoader(Reader, Scanner, Parser, RememberComposer, Resolver,
         SourceMappingConstructor.__init__(self)
 
 
-def construct_include(loader, node):
-    """Include file referenced at node."""
-    # pylint: disable=protected-access
-    filename = loader.construct_scalar(node)
-
-    extension = os.path.splitext(filename)[1].lstrip('.')
-    if extension not in ('yaml', 'yml'):
-        raise BadSchemaError("Unknown filetype '{}'".format(filename))
-
+def get_filepath(base_dir, parent, filename):
     if filename.startswith("/"):
-        if not os.path.exists(filename) and loader._base_dir is not None:
-            abs_path = os.path.join(loader._base_dir, filename[1:])
+        if not os.path.exists(filename) and base_dir is not None:
+            abs_path = os.path.join(base_dir, filename[1:])
             logger.debug("absolute path base on loader._base_dir:%s", abs_path)
             if os.path.exists(abs_path):
                 filename = abs_path
@@ -144,7 +145,63 @@ def construct_include(loader, node):
             raise BadSchemaError(
                 "Unreachable absolute path '{}'".format(filename))
     else:
-        filename = os.path.abspath(os.path.join(loader._root, filename))
+        filename = os.path.abspath(os.path.join(parent, filename))
+
+    return filename
+
+
+def is_uri(uri):
+    parse_result = urlparse.urlparse(uri)
+    if parse_result.scheme != "":
+        return True
+    return False
+
+
+class JSONSchemaLoader(JsonLoader):
+    def __init__(self, base_path, parent_path):
+        JsonLoader.__init__(self)
+        self.base_path = base_path
+        self.parent_path = parent_path
+
+    def __call__(self, uri, **kwargs):
+        if not is_uri(uri):
+            path = get_filepath(self.base_path, self.parent_path, uri)
+            uri = urlparse.urljoin('file:', pathname2url(path))
+        return JsonLoader.__call__(self, uri, **kwargs)
+
+
+def construct_schema_link(loader, node):
+    """Include file referenced at node."""
+    # pylint: disable=protected-access
+    filename = loader.construct_scalar(node)
+
+    extension = os.path.splitext(filename)[1].lstrip('.')
+    if extension not in ('yaml', 'yml', "json"):
+        raise BadSchemaError("Unknown filetype '{}'".format(filename))
+
+    loader = JSONSchemaLoader(loader._base_dir, loader._root)
+    return load_uri(filename, loader=loader)
+
+
+def construct_schema(loader, node):
+    # pylint: disable=protected-access
+    value = loader.construct_mapping(node)
+
+    loader = JSONSchemaLoader(loader._base_dir, loader._root)
+
+    return JsonRef.replace_refs(value, loader=loader)
+
+
+def construct_include(loader, node):
+    """Include file referenced at node."""
+    # pylint: disable=protected-access
+    filename = loader.construct_scalar(node)
+
+    extension = os.path.splitext(filename)[1].lstrip('.')
+    if extension not in ('yaml', 'yml'):
+        raise BadSchemaError("Unknown filetype '{}'".format(filename))
+
+    filename = get_filepath(loader._base_dir, loader._root, filename)
 
     def get_loader(stream):
         return IncludeLoader(stream, loader._base_dir)
@@ -155,6 +212,8 @@ def construct_include(loader, node):
 
 IncludeLoader.add_constructor("!include", construct_include)
 IncludeLoader.add_constructor("!uuid", makeuuid)
+IncludeLoader.add_constructor("!schema_link", construct_schema_link)
+IncludeLoader.add_constructor("!schema", construct_schema)
 
 
 class TypeSentinel(yaml.YAMLObject):

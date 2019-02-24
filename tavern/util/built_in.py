@@ -3,7 +3,7 @@ import logging
 import random
 from .compat import basestring, builtin_str, integer_types
 from .dict_util import check_keys_match_recursive
-from .json_schema_validate import jsonschema_validator
+from jsonschema import validate
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def uuid(prefix=""):
 
 # comparator
 def jsonschema_validation(check_value, schema):
-    jsonschema_validator.validate(check_value, schema)
+    validate(check_value, schema)
 
 
 def unique_item_properties(check_value, keys_or_indexs):
