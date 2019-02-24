@@ -636,7 +636,11 @@ class TestFormatKeys:
             "a3": "{b.formatted}",
             "a4": "{b.formatted_bool}",
             "a5": "this is {b.formatted_bool}",
-            "a6": "this is {b}"
+            "a6": "this is {b}",
+
+            "a7": "{a.2.formatted}",
+            "a8": "{a.2.formatted_bool}",
+            "a9": "this is {a.2}"
         }
 
         final_value = {
@@ -645,7 +649,8 @@ class TestFormatKeys:
         }
 
         format_variables = {
-            "b": final_value
+            "b": final_value,
+            "a": [final_value["formatted"], final_value["formatted_bool"], final_value]
         }
         formatted_value = format_keys(to_format, format_variables)
 
@@ -655,3 +660,6 @@ class TestFormatKeys:
         assert formatted_value["a4"]
         assert formatted_value["a5"] == "this is True"
         assert formatted_value["a6"] == "this is {'formatted': 1, 'formatted_bool': True}"
+        assert formatted_value["a7"] == 1
+        assert formatted_value["a8"]
+        assert formatted_value["a9"] == "this is {'formatted': 1, 'formatted_bool': True}"

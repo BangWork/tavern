@@ -33,6 +33,12 @@ def run_ext_function(ext, variables):
     return
 
 
+def resolve_string(variables, machobj):
+    match_str = machobj.group(1)
+    split_keys = match_str.split(".")
+    return recurse_access_key(variables, split_keys)
+
+
 def format_string(val, variables):
     """
     Args:
@@ -45,12 +51,12 @@ def format_string(val, variables):
     """
     match = re.match(r"^\{([^\{\}]+)\}$", val)
     if match is not None and match.groups():
-        match_str = match.group(1)
-        logger.debug("found match str:'%s'", match_str)
-        split_keys = match_str.split(".")
-        return recurse_access_key(variables, split_keys)
+        return resolve_string(variables, match)
 
-    return val.format(**variables)
+    def replace_fn(matchobj):
+        return str(resolve_string(variables, matchobj))
+
+    return re.sub(r"\{([^\{\}]+)\}", replace_fn, val)
 
 
 def format_keys(val, variables):
