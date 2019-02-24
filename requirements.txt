@@ -13,3 +13,5 @@ python-box
 pyyaml
 requests
 stevedore
+jsonref
+jsonschema
