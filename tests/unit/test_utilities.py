@@ -532,13 +532,26 @@ class TestCustomTokens:
 
 
 class TestIncludeSchemaSchemas:
-    def test_include_schema_with_link(self):
+    def test_include_schema_with_json_link(self):
         def get_loader(stream):
             base_dir = os.path.dirname(os.path.realpath(__file__))
             schema_dir = os.path.join(base_dir, "schema")
             return IncludeLoader(stream, schema_dir)
         text = dedent("""
-        a: !schema_link /aschema.json
+        a: !resolve_reflink /aschema.json
+        """)
+
+        obj = yaml.load(text, Loader=get_loader)
+
+        assert obj == {"a": {"a": {"b": 1}}}
+
+    def test_include_schema_with_yaml_link(self):
+        def get_loader(stream):
+            base_dir = os.path.dirname(os.path.realpath(__file__))
+            schema_dir = os.path.join(base_dir, "schema")
+            return IncludeLoader(stream, schema_dir)
+        text = dedent("""
+        a: !resolve_reflink /aschema.yaml
         """)
 
         obj = yaml.load(text, Loader=get_loader)
@@ -552,8 +565,23 @@ class TestIncludeSchemaSchemas:
             return IncludeLoader(stream, schema_dir)
         text = dedent("""
         a: 
-            !schema
+            !resolve_ref
             $ref: /aschema.json
+        """)
+
+        obj = yaml.load(text, Loader=get_loader)
+
+        assert obj == {"a": {"a": {"b": 1}}}
+
+    def test_include_schema_in_yaml(self):
+        def get_loader(stream):
+            base_dir = os.path.dirname(os.path.realpath(__file__))
+            schema_dir = os.path.join(base_dir, "schema")
+            return IncludeLoader(stream, schema_dir)
+        text = dedent("""
+        a: 
+            !resolve_ref
+            $ref: /aschema.yaml
         """)
 
         obj = yaml.load(text, Loader=get_loader)

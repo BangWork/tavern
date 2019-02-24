@@ -49,9 +49,9 @@ class ComparatorManager(object):
         elif comparator in ["len_le", "count_le", "length_less_than_or_equals",
                             "count_less_than_or_equals"]:
             return "length_less_than_or_equals"
-        elif comparator in ["json_schema"]:
+        elif comparator in ["jsonschema", "jsonschema_validation", "jv"]:
             return "jsonschema_validation"
-        elif comparator in ["unique_item_properties"]:
+        elif comparator in ["unique_item_properties", "uip"]:
             return "unique_item_properties"
 
     def get_comparator(self, alias):

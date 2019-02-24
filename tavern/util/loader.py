@@ -5,16 +5,27 @@ import logging
 import uuid
 import os.path
 import pytest
+import json
 from builtins import str as ustr
 from jsonref import JsonLoader, load_uri, JsonRef
 from future.utils import raise_from
 
+try:
+    # If requests >=1.0 is available, we will use it
+    import requests
+
+    if not callable(requests.Response.json):
+        requests = None
+except ImportError:
+    requests = None
+
 
 try:
     from urllib import parse as urlparse
-    from urllib.request import pathname2url
+    from urllib.request import pathname2url, urlopen
 except ImportError:
     import urlparse  # type: ignore
+    from urllib2 import urlopen
     from urllib import pathname2url  # type: ignore
 
 
@@ -169,21 +180,43 @@ class JSONSchemaLoader(JsonLoader):
             uri = urlparse.urljoin('file:', pathname2url(path))
         return JsonLoader.__call__(self, uri, **kwargs)
 
+    def get_remote_json(self, uri, **kwargs):
+        scheme = urlparse.urlsplit(uri).scheme
+        if scheme in ["http", "https"] and requests:
+            # Prefer requests, it has better encoding detection
+            response = requests.get(uri)
+            try:
+                response.json(**kwargs)
+            except TypeError:
+                logger.warn(
+                    "requests >=1.2 required for custom kwargs to json.loads")
+                result = response.json()
+            except ValueError:
+                # try to parsed content with yaml if parse failed
+                result = yaml.load(response.content)
+        else:
+            # Otherwise, pass off to urllib and assume utf-8
+            filename = os.path.basename(uri)
+            extension = os.path.splitext(filename)[1].lstrip('.')
+            content = urlopen(uri).read().decode("utf-8")
+            if extension in ('yaml', 'yml'):
+                result = yaml.load(content)
+            elif extension == 'json':
+                result = json.loads(content, **kwargs)
 
-def construct_schema_link(loader, node):
+        return result
+
+
+def construct_resolve_reflink(loader, node):
     """Include file referenced at node."""
     # pylint: disable=protected-access
     filename = loader.construct_scalar(node)
-
-    extension = os.path.splitext(filename)[1].lstrip('.')
-    if extension not in ('yaml', 'yml', "json"):
-        raise BadSchemaError("Unknown filetype '{}'".format(filename))
 
     loader = JSONSchemaLoader(loader._base_dir, loader._root)
     return load_uri(filename, loader=loader)
 
 
-def construct_schema(loader, node):
+def construct_resolve_ref(loader, node):
     # pylint: disable=protected-access
     value = loader.construct_mapping(node)
 
@@ -212,8 +245,8 @@ def construct_include(loader, node):
 
 IncludeLoader.add_constructor("!include", construct_include)
 IncludeLoader.add_constructor("!uuid", makeuuid)
-IncludeLoader.add_constructor("!schema_link", construct_schema_link)
-IncludeLoader.add_constructor("!schema", construct_schema)
+IncludeLoader.add_constructor("!resolve_reflink", construct_resolve_reflink)
+IncludeLoader.add_constructor("!resolve_ref", construct_resolve_ref)
 
 
 class TypeSentinel(yaml.YAMLObject):
