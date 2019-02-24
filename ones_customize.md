@@ -74,6 +74,10 @@ elif comparator in ["len_lt", "count_lt", "length_less_than", "count_less_than"]
 elif comparator in ["len_le", "count_le", "length_less_than_or_equals",
                     "count_less_than_or_equals"]:
     return "length_less_than_or_equals"
+elif comparator in ["jsonschema", "jsonschema_validation", "jv"]:
+    return "jsonschema_validation"
+elif comparator in ["unique_item_properties", "uip"]:
+    return "unique_item_properties"
 ```
 上面的 return 指代表真正对应的 comparators 方法，上面的数组则是 comparators 的别名，意思是，可以使用别名来做为 validator 的 key，其中每个函数的作用在 [Extension](#Extension) 章节里会说明
 
@@ -91,6 +95,16 @@ stages:
         - ==: ["{body.team.uuid}","abc"]
 ```
 
+同时定制化支持在 [tavern_setup_functions](#Command%20Line%20Parameters)(在命令行参数部分有介绍) 中可以通过 api 添加自定义的 comparators 
+
+```python
+# tavern-setup-functions=set_fn
+from tavern.utils.comparator_utils import comparators
+
+def set_fn(config):
+  comparators.add_comparator("alias1",comparator)
+  comparators.add_comparator(["alias1","alias2"],comparator)
+```
 
 ### Variables
 
@@ -251,6 +265,25 @@ response:
 除了以上两个内置方法，所有的 comparators 方法也可以使用 $ext 的方式调用
 参数为第一个为 checked_value, 第二个为 expect_value。需要检查的值和期待值。当 checked_value 和 expect_value 不满足比较条件时会报 AssertionError 的错误
 
+`jsonschema_validator`: 使用 jsonschema 来进行校验
+遇到文件 ref 的情况可以使用 `!resolve_ref` 和 `!resolve_reflink` 两个 yaml tag 来解决完 ref 后再使用，具体内容可以查看 ["Custom Yaml Tag"](#Custom%20Yaml%20Tag)
+```yaml
+name: test jsonschema validate
+stages:
+  - name: test jsonschema validate
+    response:
+      validate:
+        - jsonschema:
+          - "{body}"
+          - type: "object"
+            properties:
+              email: 
+                const: "{request.abc}"
+```
+
+`unique_item_properties`: 确定数组中元素的某一个或者一些属性值唯一, checked_value 为 字符串或者数组类型
+
+
 `equals`: 比较 checked_value 是否等于 expect_value，这是一个深比较。
 ```yaml
 name: test equal
@@ -334,10 +367,39 @@ stages:
 ```
 被引用进来的 stage 在运行时是加入到真正在运行的 stage 的可用变量中的。
 
+### Custom Yaml Tag
+定制版本增加了两个自定义的 yaml tag，用以解析包含 $ref 的文件格式。resolve reference 的方式和 `tavern-base-dir` 里的说明保持一致
+```yaml
+name: "abc"
+test: 
+  # resolve_ref 和 resolve_reflink 的区别是，一个解析写在其下的对象，一个解析写在其后的链接
+  !resolve_ref
+  a: 1
+  # ref 的写法是标准的 json references 的写法。可以支持网络请求，同时稍微做了一下扩展使其可以支持 yaml 的文件格式
+  $ref: "./abc.json"
+  b: 
+    $ref: "./abc.yaml"
+test_json_link: !resolve_reflink ./abc.json
+test_yaml_link: !resolve_reflink ./abc.yaml
+```
+除此之外，也可以通过一下方式增加自定义的 yaml tag
+```python
+# tavern-setup-functions=setup_functions
+from tavern.util.loader import IncludeLoader
+
+def setup_functions(config):
+  def constructor(loader,node):
+    # do something in constructor，具体实现查看 pyyaml 的文档
+    pass
+  IncludeLoader.add_constructor("!custom",constructor)
+
+```
+
 
 ### Command Line Parameters
 
 定制版本增加了以下参数:
+* `tavern-setup-functions`: 声明初始化 tavern 的一些配置的函数，主要用于增加一些自定义的 comparators
 * `tavern-function-cfg`: 声明一个函数来生成一个 variables 并且将其合并进 global variables 中.
 * `tavern_base_dir`: 声明 include 查找文件的基准地址
 ```yml
