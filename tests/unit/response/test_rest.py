@@ -89,6 +89,23 @@ def fix_nested_schema():
 
 
 class TestSave:
+    def test_save_body_with_ext(self, example_response, example_schema, includes):
+        example_schema["save"] = {
+            "$ext": {
+                "function": "random_string",
+                "extra_args": ["{body.code}"]
+            }
+        }
+        final_value = {"test_code": example_response["body"]["code"]}
+
+        includes["variables"]["body"] = example_response["body"]
+        r = RestResponse(Mock(), "Test 1", example_schema, includes)
+        with patch("tavern.util.built_in.random_string", return_value=final_value) as pmock:
+            saved = r._save_value(example_schema["save"])
+            assert final_value == saved
+
+        includes["variables"].pop("body")
+        pmock.assert_called_with(None, example_response["body"]["code"])
 
     def test_save_body(self, example_response, example_schema, includes):
         """Save a key from the body into the right name
@@ -185,6 +202,19 @@ class TestSave:
 
 
 class TestValidate:
+    def test_validate_body_with_ext(self, example_response, example_schema, includes):
+        includes["variables"]["body"] = example_response["body"]
+        validate_block = [
+            {"$ext": {
+                "function": "random_string",
+                "extra_args": ["{body.code}"]
+            }}
+        ]
+        r = RestResponse(Mock(), "Test 1", example_schema, includes)
+        with patch("tavern.util.built_in.random_string") as pmock:
+            r._validate_block(validate_block)
+        includes["variables"].pop("body")
+        pmock.assert_called_with(None, example_response["body"]["code"])
 
     def test_simple_validate_body(self, example_response, example_schema, includes):
         """Make sure a simple value comparison works

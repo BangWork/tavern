@@ -217,41 +217,49 @@ class RestResponse(BaseResponse):
         """
         for validator in validate_block:
             for key, validator_args in validator.items():
-                if key == "$ext":
-                    validate_fn = get_wrapped_response_function(validator_args)
-                    try:
-                        validate_fn(self.response)
-                    except Exception as e:  # pylint: disable=broad-except
-                        self._adderr("Error calling validate function '%s':\n%s",
-                                     validate_fn.func,
-                                     indent_err_text(traceback.format_exc()),
-                                     e=e)
+                try:
+                    formatted_validate_args = format_keys(
+                        validator_args, self.test_block_config["variables"])
+                except Exception as e:  # pylint: disable=broad-except
+                    self._adderr(
+                        "Format validate args %s for '%s' faild",
+                        validator_args,
+                        key,
+                        e=e
+                    )
                 else:
-
-                    try:
-                        comparator = comparators.get_comparator(key)
-                    except Exception as e:  # pylint: disable=broad-except
-                        self._adderr("Error getting comparator function '%s'".format,
-                                     key,
-                                     e=e
-                                     )
+                    if key == "$ext":
+                        validate_fn = get_wrapped_response_function(
+                            formatted_validate_args)
+                        try:
+                            validate_fn(self.response)
+                        except Exception as e:  # pylint: disable=broad-except
+                            self._adderr("Error calling validate function '%s':\n%s",
+                                         validate_fn.func,
+                                         indent_err_text(
+                                             traceback.format_exc()),
+                                         e=e)
                     else:
                         try:
-                            formatted_validate_args = format_keys(
-                                validator_args, self.test_block_config["variables"])
-
+                            comparator = comparators.get_comparator(key)
+                        except Exception as e:  # pylint: disable=broad-except
+                            self._adderr("Error getting comparator function '%s'".format,
+                                         key,
+                                         e=e
+                                         )
+                        else:
                             kwargs = {}
                             if len(formatted_validate_args) > 2:
                                 kwargs = formatted_validate_args.pop()
-
-                            comparator(*formatted_validate_args, **kwargs)
-                        except Exception as e:  # pylint: disable=broad-except
-                            self._adderr("Error calling comparator function '%s':\n%s",
-                                         key,
-                                         indent_err_text(
-                                             traceback.format_exc()),
-                                         e=e
-                                         )
+                            try:
+                                comparator(*formatted_validate_args, **kwargs)
+                            except Exception as e:  # pylint: disable=broad-except
+                                self._adderr("Error calling comparator function '%s':\n%s",
+                                             key,
+                                             indent_err_text(
+                                                 traceback.format_exc()),
+                                             e=e
+                                             )
 
     def _save_value(self, save_block):
         """Save a value in the response for use in future tests
@@ -268,32 +276,33 @@ class RestResponse(BaseResponse):
         saved = {}
 
         for save_as, joined_key in save_block.items():
-            if save_as == "$ext":
-                ext_fn = get_wrapped_response_function(joined_key)
-                try:
-                    to_save = ext_fn(self.response)
-                except Exception as e:  # pylint: disable=broad-except
-                    self._adderr("Error calling save function '%s':\n%s",
-                                 ext_fn.func,
-                                 indent_err_text(traceback.format_exc()),
-                                 e=e)
-                else:
-                    if isinstance(to_save, dict):
-                        saved.update(to_save)
-                    elif to_save is not None:
-                        self._adderr(
-                            "Unexpected return value '%s' from $ext save function")
+            try:
+                logger.debug("start format save key:%s", joined_key)
+                val = format_keys(
+                    joined_key, self.test_block_config["variables"])
+            except Exception as e:  # pylint: disable=broad-except
+                self._adderr(
+                    "Format saved value %s for '%s' faild",
+                    joined_key,
+                    save_as,
+                    e=e
+                )
             else:
-                try:
-                    logger.debug("start format save key:%s", joined_key)
-                    val = format_keys(
-                        joined_key, self.test_block_config["variables"])
-                except Exception as e:  # pylint: disable=broad-except
-                    self._adderr(
-                        "Format saved value for '%s' faild",
-                        save_as,
-                        e=e
-                    )
+                if save_as == "$ext":
+                    ext_fn = get_wrapped_response_function(val)
+                    try:
+                        to_save = ext_fn(self.response)
+                    except Exception as e:  # pylint: disable=broad-except
+                        self._adderr("Error calling save function '%s':\n%s",
+                                     ext_fn.func,
+                                     indent_err_text(traceback.format_exc()),
+                                     e=e)
+                    else:
+                        if isinstance(to_save, dict):
+                            saved.update(to_save)
+                        elif to_save is not None:
+                            self._adderr(
+                                "Unexpected return value '%s' from $ext save function")
                 else:
                     split_keys = save_as.split(".")
                     try:
