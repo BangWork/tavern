@@ -9,30 +9,31 @@ logger = logging.getLogger(__name__)
 
 
 def run_with_times(stage):
-    """Look for retry and try to repeat the stage `retry` times.
+    """Look for repeat and try to repeat the stage `times` times.
 
     Args:
         stage (dict): test stage
     """
 
-    times = stage.get('times', 0)
+    times = stage.get('times', 1)
 
-    if times == 0:
+    if times == 1:
         # Just return the plain function
         return lambda fn: fn
 
     def retry_wrapper(fn):
         @wraps(fn)
         def wrapped(*args, **kwargs):
-            for i in range(times + 1):
+            logger.info("Stage times: '%i'", times)
+            for i in range(times):
                 try:
                     res = fn(*args, **kwargs)
+                    logger.info("Stage '%s' repeat for %i time.", stage['name'], i + 1)
                 except exceptions.TavernException as e:
                     raise_from(
                         exceptions.TestFailError(
                             "Test '{}' failed: stage did not succeed,running by times stopped,current times:{}".format(stage['name'], i)),
                         e)
-                else:
                     break
 
             return res
