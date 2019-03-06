@@ -25,6 +25,14 @@ class ComparatorManager(object):
         """
         if comparator in ["eq", "equals", "==", "is"]:
             return "equals"
+        if comparator in ["element_equal", "element_eq"]:
+            return "element_equal"
+        if comparator in ["no_duplicate_elements"]:
+            return "no_duplicate_elements"
+        if comparator in ["not_contains"]:
+            return "not_contains"
+        if comparator in ["contains"]:
+            return "contains"
         elif comparator in ["lt", "less_than"]:
             return "less_than"
         elif comparator in ["le", "less_than_or_equals"]:

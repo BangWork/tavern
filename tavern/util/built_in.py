@@ -3,6 +3,7 @@ import logging
 import random
 from .compat import basestring, builtin_str, integer_types
 from .dict_util import check_keys_match_recursive
+from .list_util import remove_duplicate_elements
 from jsonschema import validate
 
 logger = logging.getLogger(__name__)
@@ -51,10 +52,18 @@ def unique_item_properties(check_value, keys_or_indexs):
                 assert value not in exist[key_or_index], "Found duplicate value, index is {} - {}".format(
                     exist[key_or_index][value], index)
 
-
 def equals(check_value, expect_value, **kwargs):
     check_keys_match_recursive(expect_value, check_value, [], **kwargs)
 
+def element_equal(check_list, check_value):
+    assert isinstance(check_list, list)
+    if check_list:
+        for i in check_list:
+            equals(i, check_value)
+
+def no_duplicate_elements(check_list):
+    expect_list = remove_duplicate_elements(check_list)
+    equals(check_list, expect_list)
 
 def less_than(check_value, expect_value):
     assert check_value < expect_value
@@ -104,6 +113,9 @@ def length_less_than_or_equals(check_value, expect_value):
     assert isinstance(expect_value, integer_types)
     assert len(check_value) <= expect_value
 
+def not_contains(check_value, expect_value):
+    assert isinstance(check_value, (list, tuple))
+    assert expect_value not in check_value
 
 def contains(check_value, expect_value):
     assert isinstance(check_value, (list, tuple, dict, basestring))
