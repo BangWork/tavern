@@ -54,9 +54,13 @@ def format_string(val, variables):
         return resolve_string(variables, match)
 
     def replace_fn(matchobj):
+        match_str = matchobj.group(1)
+        no_need_to_format = re.search(r"\{([^\{\}]+)\}", match_str)
+        if no_need_to_format:
+            return match_str
         return str(resolve_string(variables, matchobj))
 
-    return re.sub(r"\{([^\{\}]+)\}", replace_fn, val)
+    return re.sub(r"\{(\{{0,1}[^\{\}]+\}{0,1})\}", replace_fn, val)
 
 
 def format_keys(val, variables):
