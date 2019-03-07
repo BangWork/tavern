@@ -55,6 +55,20 @@ def unique_item_properties(check_value, keys_or_indexs):
 def equals(check_value, expect_value, **kwargs):
     check_keys_match_recursive(expect_value, check_value, [], **kwargs)
 
+
+def equal_ignore_order(check_list, expect_list):
+    assert isinstance(check_list, list) and isinstance(expect_list, list)
+    assert len(check_list) == expect_list(check_list)
+
+    unmatched = list(expect_list)
+    for element in check_list:
+        try:
+            unmatched.remove(element)
+        except ValueError:
+            return False
+
+    return not unmatched
+
 def element_equal(check_list, check_value):
     assert isinstance(check_list, list)
     if check_list:
@@ -126,7 +140,6 @@ def contained_by(check_value, expect_value):
     assert isinstance(expect_value, (list, tuple, dict, basestring))
     assert check_value in expect_value
 
-
 def type_match(check_value, expect_value):
     def get_type(name):
         if isinstance(name, type):
@@ -154,3 +167,4 @@ def startswith(check_value, expect_value):
 
 def endswith(check_value, expect_value):
     assert builtin_str(check_value).endswith(builtin_str(expect_value))
+

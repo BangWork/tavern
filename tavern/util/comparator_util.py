@@ -25,6 +25,8 @@ class ComparatorManager(object):
         """
         if comparator in ["eq", "equals", "==", "is"]:
             return "equals"
+        if comparator in ["equal_ignore_order"]:
+            return "equal_ignore_order"
         if comparator in ["element_equal", "element_eq"]:
             return "element_equal"
         if comparator in ["no_duplicate_elements"]:
