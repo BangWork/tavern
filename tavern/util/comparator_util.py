@@ -25,6 +25,8 @@ class ComparatorManager(object):
         """
         if comparator in ["eq", "equals", "==", "is"]:
             return "equals"
+        if comparator in ["element_index"]:
+            return "element_index"
         if comparator in ["equal_ignore_order"]:
             return "equal_ignore_order"
         if comparator in ["element_equal", "element_eq"]:
@@ -63,6 +65,10 @@ class ComparatorManager(object):
             return "jsonschema_validation"
         elif comparator in ["unique_item_properties", "uip"]:
             return "unique_item_properties"
+        elif comparator in ["unique_item_in_list"]:
+            return "unique_item_in_list"
+        elif comparator in ["startswith", ""]:
+            return "startswith"
 
     def get_comparator(self, alias):
         built_in_comparator = self._get_uniform_comparator(alias)

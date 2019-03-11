@@ -33,7 +33,6 @@ def uuid(prefix=""):
 def jsonschema_validation(check_value, schema):
     validate(check_value, schema)
 
-
 def unique_item_properties(check_value, keys_or_indexs):
     assert isinstance(
         check_value, (list, tuple)), "Check value for unique_item_properties must be list or tuple, value is: %s" % check_value
@@ -55,10 +54,9 @@ def unique_item_properties(check_value, keys_or_indexs):
 def equals(check_value, expect_value, **kwargs):
     check_keys_match_recursive(expect_value, check_value, [], **kwargs)
 
-
 def equal_ignore_order(check_list, expect_list):
     assert isinstance(check_list, list) and isinstance(expect_list, list)
-    assert len(check_list) == expect_list(check_list)
+    assert len(check_list) == len(check_list)
 
     unmatched = list(expect_list)
     for element in check_list:
@@ -68,6 +66,15 @@ def equal_ignore_order(check_list, expect_list):
             return False
 
     return not unmatched
+
+def unique_item_in_list(check_list, check_value):
+    assert check_value in check_list
+    no_duplicate_elements(check_list)
+
+def element_index(check_list, check_value, **kwargs):
+    for index, element in enumerate(check_list):
+        if index == kwargs["expect_index"]:
+            return equals(element, check_value)
 
 def element_equal(check_list, check_value):
     assert isinstance(check_list, list)
