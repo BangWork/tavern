@@ -49,13 +49,13 @@ def format_string(val, variables):
         return str when format like "acb {} a {} bc"
         return others when format like "{}"
     """
-    match = re.match(r"^\{([^\{\}].+)\}$", val)
+    match = re.match(r"^\{([^\{\}\n]+)\}$", val)
     if match is not None and match.groups():
         return resolve_string(variables, match)
 
     def replace_fn(matchobj):
         match_str = matchobj.group(1)
-        no_need_to_format = re.search(r"\{([^\{\}].+)\}", match_str)
+        no_need_to_format = re.search(r"\{([^\{\}\n]+)\}", match_str)
         if no_need_to_format:
             return match_str
         return str(resolve_string(variables, matchobj))
