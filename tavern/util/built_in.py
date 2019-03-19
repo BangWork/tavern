@@ -57,15 +57,19 @@ def equals(check_value, expect_value, **kwargs):
 def equal_ignore_order(check_list, expect_list):
     assert isinstance(check_list, list) and isinstance(expect_list, list)
     assert len(check_list) == len(check_list)
+    
+    return equals(check_list.sort(), expect_list.sort())
 
-    unmatched = list(expect_list)
-    for element in check_list:
-        try:
-            unmatched.remove(element)
-        except ValueError:
-            return False
-
-    return not unmatched
+def sorted_by_key(check_list, check_key, **kwargs):
+    list_in_dict = []
+    sort_key = kwargs["sort_key"]
+    expect_list = kwargs["expect_list"]
+    check_list = sorted(check_list,key = lambda e:e.__getitem__(sort_key))
+    for i in check_list:
+        for key,value in i.items():
+            if key == check_key:
+                list_in_dict.append(value)
+    return equals(list_in_dict, expect_list)
 
 def unique_item_in_list(check_list, check_value):
     assert check_value in check_list
@@ -76,7 +80,7 @@ def element_index(check_list, check_value, **kwargs):
         if index == kwargs["expect_index"]:
             return equals(element, check_value)
 
-def element_equal(check_list, check_value):
+def element_equals(check_list, check_value):
     assert isinstance(check_list, list)
     if check_list:
         for i in check_list:
@@ -135,7 +139,7 @@ def length_less_than_or_equals(check_value, expect_value):
     assert len(check_value) <= expect_value
 
 def not_contains(check_value, expect_value):
-    assert isinstance(check_value, (list, tuple))
+    assert isinstance(check_value, (list, tuple, dict, basestring))
     assert expect_value not in check_value
 
 def contains(check_value, expect_value):
@@ -174,4 +178,6 @@ def startswith(check_value, expect_value):
 
 def endswith(check_value, expect_value):
     assert builtin_str(check_value).endswith(builtin_str(expect_value))
+
+
 
