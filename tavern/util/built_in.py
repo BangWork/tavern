@@ -3,7 +3,7 @@ import logging
 import random
 from .compat import basestring, builtin_str, integer_types
 from .dict_util import check_keys_match_recursive
-from .list_util import remove_duplicate_elements
+from functools import reduce
 from jsonschema import validate
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,10 @@ def element_equals(check_list, check_value):
     if check_list:
         for i in check_list:
             equals(i, check_value)
+
+def remove_duplicate_elements(check_list):
+    func = lambda x,y:x if y in x else x + [y]
+    return reduce(func, [[], ] + check_list)
 
 def no_duplicate_elements(check_list):
     expect_list = remove_duplicate_elements(check_list)

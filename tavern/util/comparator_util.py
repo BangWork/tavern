@@ -29,6 +29,8 @@ class ComparatorManager(object):
             return "element_index"
         if comparator in ["equal_ignore_order"]:
             return "equal_ignore_order"
+        if comparator in ["sorted_by_key"]:
+            return "sorted_by_key"
         if comparator in ["element_equal", "element_eq"]:
             return "element_equal"
         if comparator in ["no_duplicate_elements"]:
