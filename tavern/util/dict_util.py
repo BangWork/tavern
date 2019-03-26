@@ -85,7 +85,8 @@ def format_keys(val, variables):
         else:
             formatted = {}
             for key in val:
-                formatted[key] = format_keys(val[key], box_vars)
+                expect_key = format_keys(key, box_vars)
+                formatted[expect_key] = format_keys(val[key], box_vars)
     elif isinstance(val, (list, tuple)):
         formatted = [format_keys(item, box_vars) for item in val]
     elif isinstance(val, (ustr, str)):
