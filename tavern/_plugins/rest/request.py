@@ -74,8 +74,7 @@ def get_request_args(rspec, test_block_config):
         rspec["method"] = "GET"
 
     content_keys = [
-        "data",
-        "json",
+        "json"
     ]
 
     headers = rspec.get("headers", {})

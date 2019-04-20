@@ -49,14 +49,18 @@ def format_string(val, variables):
         return str when format like "acb {} a {} bc"
         return others when format like "{}"
     """
-    match = re.match(r"^\{([^\{\}]+)\}$", val)
+    match = re.match(r"^\{([^\{\}\n]+)\}$", val)
     if match is not None and match.groups():
         return resolve_string(variables, match)
 
     def replace_fn(matchobj):
+        match_str = matchobj.group(1)
+        no_need_to_format = re.search(r"\{([^\{\}\n]+)\}", match_str)
+        if no_need_to_format:
+            return match_str
         return str(resolve_string(variables, matchobj))
 
-    return re.sub(r"\{([^\{\}]+)\}", replace_fn, val)
+    return re.sub(r"\{(\{{0,1}[^\{\}\n]+\}{0,1})\}", replace_fn, val)
 
 
 def format_keys(val, variables):
@@ -73,7 +77,7 @@ def format_keys(val, variables):
     box_vars = Box(variables)
 
     if isinstance(val, dict):
-
+        
         # formatted = {key: format_keys(val[key], box_vars) for key in val}
         # format_keys 增加了对于 yaml 中 dict 类型中包含 $ext 关键字的解析
         if "$ext" in val:
@@ -81,7 +85,8 @@ def format_keys(val, variables):
         else:
             formatted = {}
             for key in val:
-                formatted[key] = format_keys(val[key], box_vars)
+                expect_key = format_keys(key, box_vars)
+                formatted[expect_key] = format_keys(val[key], box_vars)
     elif isinstance(val, (list, tuple)):
         formatted = [format_keys(item, box_vars) for item in val]
     elif isinstance(val, (ustr, str)):
