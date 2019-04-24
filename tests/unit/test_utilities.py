@@ -589,6 +589,18 @@ class TestIncludeSchemaSchemas:
         assert obj == {"a": {"a": {"b": 1}}}
 
 
+class TestIncludeLoader:
+    def test_include_with_cicle_include(self):
+        def get_loader(stream):
+            base_dir = os.path.dirname(os.path.realpath(__file__))
+            schema_dir = os.path.join(base_dir, "schema")
+            return IncludeLoader(stream, schema_dir)
+        text = dedent("""
+        a: !include /circle_a.yaml
+        """)
+        yaml.load(text, Loader=get_loader)
+
+
 class TestFormatKeys:
     def test_format_with_extention(self):
         to_format = {

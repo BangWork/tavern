@@ -1,0 +1,1 @@
+a: !include ./circle_b.yaml
