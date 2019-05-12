@@ -169,20 +169,6 @@ def pytest_addoption(parser):
         default=[]
     )
 
-# @pytest.mark.hookwrapper
-# def pytest_runtest_makereport(item):
-    # # ??? 什么鬼？
-    # outcome = yield
-    # report = outcome.get_result()
-    # # 没做插件怎么办？
-    # pytest_html = item.config.pluginmanager.getplugin('html')
-    # if pytest_html is not None:
-    #     extra = getattr(report, 'extra', [])
-    #     if report.when == 'call':
-    #         extra.append(pytest_html.extras.json(item.result, "summay"))
-    #         report.extra = extra
-
-
 class YamlFile(pytest.File):
 
     """Custom `File` class that loads each test block as a different test
@@ -389,6 +375,7 @@ class YamlItem(pytest.Item):
         self.spec = spec
         self.global_cfg = self._initialize_variables()
         self._resolve_variables(self.spec)
+        self.exceptions = None
 
     def initialise_fixture_attrs(self):
         # pylint: disable=protected-access,attribute-defined-outside-init
@@ -592,10 +579,11 @@ class YamlItem(pytest.Item):
                 logger.info("xfailing test while verifying schema")
             else:
                 raise
-        except exceptions.TavernException:
+        except exceptions.TavernException as e:
             if xfail == "run":
                 logger.info("xfailing test when running")
             else:
+                self.exceptions = e
                 raise
         else:
             if xfail:
