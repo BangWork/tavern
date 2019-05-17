@@ -67,7 +67,7 @@ def element_equals_with_index(check_list, expect_value, **kwargs):
                       ), "Check list for element_equals_with_index must be list or tuple, given value is %s" % check_list
 
     index = kwargs["index"]
-    if abs(index) >= len(check_list):
+    if abs(index) > len(check_list):
         raise_from(exceptions.MissingFormatError(
             """
             List index out of range, list is {}, index is {}
@@ -114,16 +114,15 @@ def list_equals_by_sorted_key(check_list, expect_list, **kwargs):
     assert isinstance(expect_list, (list, tuple)
                       ), "Expect list for list_equals_by_sorted_key must be list or tuple, given value is %s" % check_list
     assert len(check_list) == len(expect_list)
-
     sort_key = kwargs["sort_key"]
     check_list = sorted(check_list, key=lambda e: e.__getitem__(sort_key))
+    
     if "check_key" in kwargs:
         check_key = kwargs["check_key"]
 
         def save_check_key(item):
             return item[check_key]
-        check_list = map(save_check_key, check_list)
-
+        check_list = list(map(save_check_key, check_list))
     equals(check_list, expect_list)
 
 
