@@ -134,25 +134,23 @@ def run_test(in_file, test_spec, global_cfg):
                 logger.debug(
                     "Default strictness '%s' ignored for this stage", default_strictness)
 
-            response = {}
             # Wrap run_stage with retry helpe
             run_stage_with_retries = retry(stage)(run_stage)
             run_stage_with_times = run_with_times(
                 stage)(run_stage_with_retries)
             try:
                 run_stage_with_times(
-                    sessions, stage, test_block_config, response)
+                    sessions, stage, test_block_config)
             except exceptions.TavernException as e:
                 e.stage = stage
                 e.test_block_config = test_block_config
-                e.response = response
                 raise
 
             if stage.get('only'):
                 break
 
 
-def run_stage(sessions, stage, test_block_config, response):
+def run_stage(sessions, stage, test_block_config):
     """Run one stage from the test
 
     Args:
@@ -161,7 +159,6 @@ def run_stage(sessions, stage, test_block_config, response):
         tavern_box (box.Box): Box object containing format variables to be used
             in test
         test_block_config (dict): available variables for test
-        response: response
     """
     name = stage["name"]
 
@@ -174,14 +171,15 @@ def run_stage(sessions, stage, test_block_config, response):
     delay(stage, "before")
 
     logger.info("Running stage : %s", name)
-    response_instance = r.run()
-    response.update({
-        "text": response_instance.text
-    })
+    response = r.run()
     verifiers = get_verifiers(stage, test_block_config, sessions, expected)
     for v in verifiers:
-        saved = v.verify(response_instance)
-        test_block_config["variables"].update(saved)
+        try:
+            saved = v.verify(response)
+            test_block_config["variables"].update(saved)
+        except Exception as e:
+            e.response = response.text
+            raise
 
     test_block_config["variables"].pop("request")
     delay(stage, "after")
