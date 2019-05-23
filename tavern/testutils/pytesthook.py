@@ -50,7 +50,6 @@ def pytest_configure(config):
                 raise_from(exceptions.CallSetupFunctionError(
                     "Error Running setup function {}".format(setup_function)), e)
 
-
 def pytest_collect_file(parent, path):
     """On collecting files, get any files that end in .tavern.yaml or .tavern.yml as tavern
     test files
@@ -62,7 +61,6 @@ def pytest_collect_file(parent, path):
         return YamlFile(path, parent)
 
     return None
-
 
 def add_parser_options(parser_addoption, with_defaults=True):
     """Add argparse options
@@ -355,6 +353,22 @@ class YamlFile(pytest.File):
                 verify_tests(test_spec, with_plugins=False)
                 raise
 
+class YamlItemContext():
+    def __init__(self):
+        self.context = {}
+
+    def get_context(self, key):
+        if key not in self.context:
+            return None
+        return self.context[key]
+
+    def update_context(self, key, context):
+        if key in self.context:
+            self.context[key].update(context)
+        else:
+            self.context[key] = context
+
+yaml_item_context = YamlItemContext()
 
 class YamlItem(pytest.Item):
 
@@ -374,7 +388,7 @@ class YamlItem(pytest.Item):
         self.path = path
         self.spec = spec
         self.global_cfg = self._initialize_variables()
-        self._resolve_variables(self.spec)
+        self._resolve_variables(self.spec, self.global_cfg)
         self.exceptions = None
 
     def initialise_fixture_attrs(self):
@@ -444,22 +458,23 @@ class YamlItem(pytest.Item):
         global_cfg = self._parse_arguments()
         global_cfg.setdefault("variables", {})
         tavern_box = Box({
-            "env_vars": dict(os.environ),
+            "env_vars": dict(os.environ)
         })
         global_cfg["variables"]["tavern"] = tavern_box
+
         return global_cfg
 
-    def _resolve_variables(self, test_spec):
+    def _resolve_variables(self, test_spec, global_cfg):
 
         if "includes" in test_spec:
             for included in test_spec["includes"]:
-                self._resolve_variables(included)
+                self._resolve_variables(included, global_cfg)
 
         if "variables" in test_spec:
             formatted_include = format_keys(
-                test_spec["variables"], self.global_cfg["variables"])
-            self.global_cfg["variables"] = deep_dict_merge(
-                self.global_cfg["variables"], formatted_include)
+                test_spec["variables"], global_cfg["variables"])
+            global_cfg["variables"] = deep_dict_merge(
+                global_cfg["variables"], formatted_include)
 
     def _parse_arguments(self):
         # Load ini first
@@ -554,12 +569,59 @@ class YamlItem(pytest.Item):
 
         return values
 
+    def _load_dependent_varialbes(self):
+        dependent_varialbes = yaml_item_context.get_context(self.path.basename)
+
+        if not dependent_varialbes:
+            dependent_path = os.path.join(self.path.dirname, "dependent.yaml")
+            if os.path.exists(dependent_path):
+                # parse schema
+                dependent_spec = None
+                try:
+                    def get_loader(stream):
+                        base_dir = self.config.getoption("tavern_base_dir")
+                        if base_dir is None:
+                            base_dir = self.config.getini("tavern-base-dir")
+                        rootdir = str(self.config.rootdir)
+                        if base_dir is not None:
+                            base_dir = os.path.join(rootdir, base_dir)
+                        else:
+                            base_dir = rootdir
+                        return IncludeLoader(stream, base_dir)
+                    with open(dependent_path, 'r') as f:
+                        dependent_spec = yaml.load(f, Loader=get_loader)
+                except yaml.parser.ParserError as e:
+                    raise_from(exceptions.BadSchemaError, e)
+
+                # run dependent
+                dependent_global_cfg = self._initialize_variables()
+                self._resolve_variables(dependent_spec, dependent_global_cfg)
+                try:
+                    verify_tests(dependent_spec)
+                    run_test(dependent_path, dependent_spec, dependent_global_cfg)
+                except exceptions.BadSchemaError:
+                    if xfail == "verify":
+                        logger.info("xfailing test while verifying schema")
+                    else:
+                        raise
+
+                # save dependent context
+                dependent_varialbes = dependent_global_cfg["variables"]
+                yaml_item_context.update_context(self.path.basename, dependent_varialbes)
+            else:
+                dependent_varialbes = {}
+
+        return copy.deepcopy(dependent_varialbes)
+
     def runtest(self):
         global_cfg = copy.deepcopy(self.global_cfg)
 
         global_cfg.setdefault("variables", {})
 
         load_plugins(global_cfg)
+
+        dependent_varialbes = self._load_dependent_varialbes()
+        global_cfg["variables"].update(dependent_varialbes)
 
         # INTERNAL
         # NOTE - now that we can 'mark' tests, we could use pytest.mark.xfail
