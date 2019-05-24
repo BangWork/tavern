@@ -352,7 +352,6 @@ class YamlFile(pytest.File):
             # Convert to a list so we can catch parser exceptions
             logger.debug("self.fspath:%s", self.fspath)
             path = str(self.fspath)
-            yaml_loader.include_chain[path] = [path]
             all_tests = yaml_loader(path)
         except yaml.parser.ParserError as e:
             raise_from(exceptions.BadSchemaError, e)
