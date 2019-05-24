@@ -23,7 +23,7 @@ from tavern.util.import_util import import_ext_function
 from tavern.util import exceptions
 from tavern.util.dict_util import format_keys, deep_dict_merge
 from tavern.util.general import load_global_config
-from tavern.util.loader import IncludeLoader
+from tavern.util.loader import yaml_loader, schema_loader
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,19 @@ def pytest_configure(config):
     ini_setup_functions = config.getini("tavern-setup-functions") or []
 
     setup_functions = set(commandline_setup_functions + ini_setup_functions)
+
+    base_dir = config.getoption("tavern_base_dir")
+    if base_dir is None:
+        base_dir = config.getini("tavern-base-dir")
+
+    rootdir = str(config.rootdir)
+    if base_dir is not None:
+        base_dir = os.path.join(rootdir, base_dir)
+    else:
+        base_dir = rootdir
+
+    schema_loader.base_dir = base_dir
+    yaml_loader.base_dir = base_dir
 
     for setup_function in setup_functions:
         try:
@@ -58,6 +71,7 @@ def pytest_collect_file(parent, path):
     Todo:
         Change this to .tyaml or something?
     """
+
     if match_tavern_file(path.basename):
         return YamlFile(path, parent)
 
@@ -337,21 +351,9 @@ class YamlFile(pytest.File):
         try:
             # Convert to a list so we can catch parser exceptions
             logger.debug("self.fspath:%s", self.fspath)
-
-            def loader(stream):
-                base_dir = self.config.getoption("tavern_base_dir")
-                if base_dir is None:
-                    base_dir = self.config.getini("tavern-base-dir")
-                rootdir = str(self.config.rootdir)
-                if base_dir is not None:
-                    base_dir = os.path.join(rootdir, base_dir)
-                else:
-                    base_dir = rootdir
-
-                return IncludeLoader(stream, base_dir)
-
-            all_tests = list(yaml.load_all(self.fspath.open(
-                encoding="utf-8"), Loader=loader))
+            path = str(self.fspath)
+            yaml_loader.include_chain[path] = [path]
+            all_tests = yaml_loader(path)
         except yaml.parser.ParserError as e:
             raise_from(exceptions.BadSchemaError, e)
 

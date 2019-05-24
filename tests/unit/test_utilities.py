@@ -1,17 +1,14 @@
 import os
 from textwrap import dedent
-import jsonschema
-from mock import Mock, patch
 from collections import OrderedDict
-
+import copy
+import jsonschema
+from mock import patch
 import pytest
 import yaml
-import copy
-from builtins import str as ustr
-
 from tavern.schemas.extensions import validate_extensions, validate_block
 from tavern.util import exceptions
-from tavern.util.loader import ANYTHING, IncludeLoader
+from tavern.util.loader import IncludeLoader, schema_loader, yaml_loader, ANYTHING
 from tavern.util.dict_util import deep_dict_merge, check_keys_match_recursive, format_keys
 from tavern.util.built_in import unique_item_properties, jsonschema_validation
 
@@ -531,74 +528,68 @@ class TestCustomTokens:
         )
 
 
+def init_path_loader():
+    base_dir = os.path.dirname(os.path.realpath(__file__))
+    schema_dir = os.path.join(base_dir, "schema")
+    yaml_loader.base_dir = schema_dir
+    schema_loader.base_dir = schema_dir
+
+
 class TestIncludeSchemaSchemas:
     def test_include_schema_with_json_link(self):
-        def get_loader(stream):
-            base_dir = os.path.dirname(os.path.realpath(__file__))
-            schema_dir = os.path.join(base_dir, "schema")
-            return IncludeLoader(stream, schema_dir)
+        init_path_loader()
+
         text = dedent("""
         a: !resolve_reflink /aschema.json
         """)
 
-        obj = yaml.load(text, Loader=get_loader)
+        obj = yaml.load(text, Loader=IncludeLoader)
 
         assert obj == {"a": {"a": {"b": 1}}}
 
     def test_include_schema_with_yaml_link(self):
-        def get_loader(stream):
-            base_dir = os.path.dirname(os.path.realpath(__file__))
-            schema_dir = os.path.join(base_dir, "schema")
-            return IncludeLoader(stream, schema_dir)
+        init_path_loader()
         text = dedent("""
         a: !resolve_reflink /aschema.yaml
         """)
 
-        obj = yaml.load(text, Loader=get_loader)
+        obj = yaml.load(text, Loader=IncludeLoader)
 
         assert obj == {"a": {"a": {"b": 1}}}
 
     def test_include_schema(self):
-        def get_loader(stream):
-            base_dir = os.path.dirname(os.path.realpath(__file__))
-            schema_dir = os.path.join(base_dir, "schema")
-            return IncludeLoader(stream, schema_dir)
+        init_path_loader()
         text = dedent("""
         a: 
             !resolve_ref
             $ref: /aschema.json
         """)
 
-        obj = yaml.load(text, Loader=get_loader)
+        obj = yaml.load(text, Loader=IncludeLoader)
 
         assert obj == {"a": {"a": {"b": 1}}}
 
     def test_include_schema_in_yaml(self):
-        def get_loader(stream):
-            base_dir = os.path.dirname(os.path.realpath(__file__))
-            schema_dir = os.path.join(base_dir, "schema")
-            return IncludeLoader(stream, schema_dir)
+        init_path_loader()
         text = dedent("""
         a: 
             !resolve_ref
             $ref: /aschema.yaml
         """)
 
-        obj = yaml.load(text, Loader=get_loader)
+        obj = yaml.load(text, Loader=IncludeLoader)
 
         assert obj == {"a": {"a": {"b": 1}}}
 
 
 class TestIncludeLoader:
     def test_include_with_cicle_include(self):
-        def get_loader(stream):
-            base_dir = os.path.dirname(os.path.realpath(__file__))
-            schema_dir = os.path.join(base_dir, "schema")
-            return IncludeLoader(stream, schema_dir)
+        init_path_loader()
         text = dedent("""
         a: !include /circle_a.yaml
         """)
-        yaml.load(text, Loader=get_loader)
+
+        yaml.load(text, Loader=IncludeLoader)
 
 
 class TestFormatKeys:

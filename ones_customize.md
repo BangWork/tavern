@@ -385,7 +385,7 @@ test_yaml_link: !resolve_reflink ./abc.yaml
 除此之外，也可以通过一下方式增加自定义的 yaml tag
 ```python
 # tavern-setup-functions=setup_functions
-from tavern.util.loader import IncludeLoader
+from tavern.util.loader IncludeLoader
 
 def setup_functions(config):
   def constructor(loader,node):

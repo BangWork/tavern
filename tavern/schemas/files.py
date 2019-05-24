@@ -43,7 +43,8 @@ class SchemaCache(object):
             return self._loaded[mangled]
         except KeyError:
             plugins = load_plugins()
-            base_schema = copy.deepcopy(self._load_base_schema(schema_filename))
+            base_schema = copy.deepcopy(
+                self._load_base_schema(schema_filename))
 
             logger.debug("Adding plugins to schema: %s", plugins)
 
@@ -54,7 +55,8 @@ class SchemaCache(object):
                     # Don't require a schema
                     logger.debug("No schema defined for %s", p.name)
                 else:
-                    base_schema["mapping"].update(plugin_schema.get("initialisation", {}))
+                    base_schema["mapping"].update(
+                        plugin_schema.get("initialisation", {}))
 
             self._loaded[mangled] = base_schema
             return self._loaded[mangled]
