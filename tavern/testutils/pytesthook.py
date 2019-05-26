@@ -357,18 +357,20 @@ class YamlItemContext():
     def __init__(self):
         self.context = {}
 
-    def get_context(self, key):
-        if key not in self.context:
+    def get_context(self, path):
+        if path not in self.context:
             return None
-        return self.context[key]
 
-    def update_context(self, key, context):
-        if key in self.context:
-            self.context[key].update(context)
+        return self.context[path]
+
+    def update_context(self, path, context):
+        if path in self.context:
+            self.context[path].update(context)
         else:
-            self.context[key] = context
+            self.context[path] = context
 
 yaml_item_context = YamlItemContext()
+
 
 class YamlItem(pytest.Item):
 
@@ -569,49 +571,44 @@ class YamlItem(pytest.Item):
 
         return values
 
-    def _load_dependent_varialbes(self):
-        dependent_varialbes = yaml_item_context.get_context(self.path.basename)
-
-        if not dependent_varialbes:
-            dependent_path = os.path.join(self.path.dirname, "dependent.yaml")
-            if os.path.exists(dependent_path):
-                # parse schema
-                dependent_spec = None
-                try:
-                    def get_loader(stream):
-                        base_dir = self.config.getoption("tavern_base_dir")
-                        if base_dir is None:
-                            base_dir = self.config.getini("tavern-base-dir")
-                        rootdir = str(self.config.rootdir)
-                        if base_dir is not None:
-                            base_dir = os.path.join(rootdir, base_dir)
-                        else:
-                            base_dir = rootdir
-                        return IncludeLoader(stream, base_dir)
-                    with open(dependent_path, 'r') as f:
-                        dependent_spec = yaml.load(f, Loader=get_loader)
-                except yaml.parser.ParserError as e:
-                    raise_from(exceptions.BadSchemaError, e)
-
-                # run dependent
-                dependent_global_cfg = self._initialize_variables()
-                self._resolve_variables(dependent_spec, dependent_global_cfg)
-                try:
-                    verify_tests(dependent_spec)
-                    run_test(dependent_path, dependent_spec, dependent_global_cfg)
-                except exceptions.BadSchemaError:
-                    if xfail == "verify":
-                        logger.info("xfailing test while verifying schema")
-                    else:
-                        raise
-
-                # save dependent context
-                dependent_varialbes = dependent_global_cfg["variables"]
-                yaml_item_context.update_context(self.path.basename, dependent_varialbes)
+    def _load_setup_varialbes(self, setup):
+        def run_setup(path):
+            base_dir = self.config.getoption("tavern_base_dir")
+            if base_dir is None:
+                base_dir = self.config.getini("tavern-base-dir")
+            rootdir = str(self.config.rootdir)
+            if base_dir is not None:
+                base_dir = os.path.join(rootdir, base_dir)
             else:
-                dependent_varialbes = {}
+                base_dir = rootdir
 
-        return copy.deepcopy(dependent_varialbes)
+            path = os.path.join(base_dir, path[1:])
+            setup_file = YamlFile(path, self.parent.parent)
+            item = list(setup_file.collect())[0]
+            item.runtest()
+            setup_varialbes = item.global_cfg["variables"]
+
+            return setup_varialbes
+
+        setup_path = setup
+        # 需要重新执行setup
+        if isinstance(setup, dict):
+            setup_path = setup["path"]
+            if "saved" in setup and not setup["saved"]:
+                setup_varialbes = run_setup(setup_path)
+                return copy.deepcopy(setup_varialbes)
+
+        # 如果context有就用context
+        # isinstance(setup, str)
+        # isinstance(setup, dict) "saved" in setup and setup["saved"] == Ture
+        # isinstance(setup, dict) "saved" not in setup
+        setup_varialbes = yaml_item_context.get_context(setup_path)
+        # 如果存在context，直接用
+        if not setup_varialbes:
+            setup_varialbes = run_setup(setup_path)
+            yaml_item_context.update_context(setup_path, setup_varialbes)
+
+        return copy.deepcopy(setup_varialbes)
 
     def runtest(self):
         global_cfg = copy.deepcopy(self.global_cfg)
@@ -620,15 +617,17 @@ class YamlItem(pytest.Item):
 
         load_plugins(global_cfg)
 
-        dependent_varialbes = self._load_dependent_varialbes()
-        global_cfg["variables"].update(dependent_varialbes)
+        if "setup" in self.spec:
+            for i in self.spec["setup"]:
+                setup_varialbes = self._load_setup_varialbes(i)
+                global_cfg["variables"].update(setup_varialbes)
 
         # INTERNAL
         # NOTE - now that we can 'mark' tests, we could use pytest.mark.xfail
         # instead. This doesn't differentiate between an error in verification
         # and an error when running the test though.
         xfail = self.spec.get("_xfail", False)
-
+       
         try:
             verify_tests(self.spec)
 
@@ -647,11 +646,12 @@ class YamlItem(pytest.Item):
             else:
                 self.exceptions = e
                 raise
-        else:
+        else:            
             if xfail:
                 logger.error("Expected test to fail")
                 raise exceptions.TestFailError(
                     "Expected test to fail at {} stage".format(xfail))
+            self.global_cfg = global_cfg
 
     def repr_failure(self, excinfo):  # pylint: disable=no-self-use
         """ called when self.runtest() raises an exception.

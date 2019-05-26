@@ -414,6 +414,21 @@ schema;include_stage:
             - include: stage
             - include: stage_ref
 
+schema;setup:
+  required: false
+  type: seq
+  sequence:
+    - type: str
+      required: true
+    - type: map
+      mapping:
+        path:
+          type: str
+          required: true
+        saved:
+          type: bool
+          required: false
+
 type: map
 mapping:
   name:
@@ -431,6 +446,8 @@ mapping:
     type: any
   includes:
     include: include_stage
+  setup:
+    include: setup
   variables:
     include: variables
   stages:
