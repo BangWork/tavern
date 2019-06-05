@@ -571,31 +571,31 @@ class YamlItem(pytest.Item):
 
         return values
 
+    def _run_setup(self, path):
+        base_dir = self.config.getoption("tavern_base_dir")
+        if base_dir is None:
+            base_dir = self.config.getini("tavern-base-dir")
+        rootdir = str(self.config.rootdir)
+        if base_dir is not None:
+            base_dir = os.path.join(rootdir, base_dir)
+        else:
+            base_dir = rootdir
+
+        path = os.path.join(base_dir, path[1:])
+        setup_file = YamlFile(path, self.parent.parent)
+        item = list(setup_file.collect())[0]
+        item.runtest()
+        setup_varialbes = item.global_cfg["variables"]
+
+        return setup_varialbes
+
     def _load_setup_varialbes(self, setup):
-        def run_setup(path):
-            base_dir = self.config.getoption("tavern_base_dir")
-            if base_dir is None:
-                base_dir = self.config.getini("tavern-base-dir")
-            rootdir = str(self.config.rootdir)
-            if base_dir is not None:
-                base_dir = os.path.join(rootdir, base_dir)
-            else:
-                base_dir = rootdir
-
-            path = os.path.join(base_dir, path[1:])
-            setup_file = YamlFile(path, self.parent.parent)
-            item = list(setup_file.collect())[0]
-            item.runtest()
-            setup_varialbes = item.global_cfg["variables"]
-
-            return setup_varialbes
-
         setup_path = setup
         # 需要重新执行setup
         if isinstance(setup, dict):
             setup_path = setup["path"]
             if "saved" in setup and not setup["saved"]:
-                setup_varialbes = run_setup(setup_path)
+                setup_varialbes = self._run_setup(setup_path)
                 return copy.deepcopy(setup_varialbes)
 
         # 如果context有就用context
@@ -605,7 +605,7 @@ class YamlItem(pytest.Item):
         setup_varialbes = yaml_item_context.get_context(setup_path)
         # 如果存在context，直接用
         if not setup_varialbes:
-            setup_varialbes = run_setup(setup_path)
+            setup_varialbes = self._run_setup(setup_path)
             yaml_item_context.update_context(setup_path, setup_varialbes)
 
         return copy.deepcopy(setup_varialbes)
