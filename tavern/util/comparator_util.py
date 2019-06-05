@@ -35,6 +35,8 @@ class ComparatorManager(object):
             return "list_contains_with_items"
         if comparator in ["list_not_contains_with_items"]:
             return "list_not_contains_with_items"
+        if comparator in ["item_equals_in_list"]:
+            return "item_equals_in_list"
         if comparator in ["not_contains"]:
             return "not_contains"
         if comparator in ["contains"]:

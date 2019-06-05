@@ -99,14 +99,32 @@ def equals_ignore_order(check_list, expect_list, **kwargs):
     # dict, check_key must be string or number
     else:
         ckeys = []
-        for i in check_list:
-            ckeys.append(i[check_key])
-
         ekeys = []
-        for i in expect_list:
-            ekeys.append(i[check_key])
-        equals_ignore_order(ckeys, ekeys)
+        if isinstance(check_key, str):
+            for i in range(len(check_list)):
+                if check_key not in check_list[i] or check_key not in expect_list[i]:
+                    raise AssertionError(
+                    """
+                    not found {} in {} or {}
+                    """.format(check_key, check_list[i], expect_list[i]))
+                ckeys.append(check_list[i])
+                ekeys.append(expect_list[i])
+        elif isinstance(check_key, (list, tuple)):
+            check_value_list = []
+            expect_value_list = []
+            for i in range(len(check_list)):
+                for j in check_key:
+                    if j not in check_list[i] or j not in expect_list[i]:
+                        raise AssertionError(
+                        """
+                        not found {} in {} or {}
+                        """.format(j, check_list[i], expect_list[i]))
+                    check_value_list.append(check_list[i][j])
+                    expect_value_list.append(expect_list[i][j])
+                ckeys.append(check_value_list)
+                ekeys.append(expect_value_list)
 
+        equals_ignore_order(ckeys, ekeys)
 
 def list_equals_by_sorted_key(check_list, expect_list, **kwargs):
     assert isinstance(check_list, (list, tuple)
@@ -237,6 +255,55 @@ def list_not_contains_with_items(check_list, check_value, **kwargs):
         raise AssertionError("%s not found in %s" % (check_value, check_list))
     return
 
+def item_equals_in_list(check_list, check_key = "", **kwargs):
+    assert isinstance(check_list, (list, tuple)
+                      ), "Check list must be list or tuple, given value is %s" % check_list
+    if not check_list:
+        return
+
+    expect_key = kwargs["expect_key"] if "expect_key" in kwargs else ""
+
+    if not check_key:
+        item = check_list[0]
+        if expect_key:
+            equals(item, expect_key)
+        for i in check_list[1:]:
+            equals(item, i)
+        return
+
+    check_object = {}
+    for i in check_list:
+
+        key = ""
+        if isinstance(check_key, str):
+            if check_key not in i:
+                raise AssertionError(
+                    """
+                    not found {} in {}
+                    """.format(check_key, i))
+            key = i[check_key]
+        elif isinstance(check_key, (list, tuple)):
+            check_key_value = []
+            for j in check_key:
+                if j not in i:
+                    raise AssertionError(
+                        """
+                        not found {} in {}
+                        """.format(j, i))
+                check_key_value.append(str(i[j]))
+
+            key = ''.join(check_key_value)
+
+        if expect_key:
+            equals(key, expect_key)
+
+        if check_object and key not in check_object:
+                raise AssertionError(
+                        """
+                        key {} not found in {}
+                        """.format(key, check_object))
+        else:
+            check_object.update({ key: True })
 
 def contained_by(check_value, expect_value):
     assert isinstance(expect_value, (list, tuple, dict, basestring))
