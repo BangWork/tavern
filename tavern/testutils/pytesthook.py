@@ -617,11 +617,6 @@ class YamlItem(pytest.Item):
 
         load_plugins(global_cfg)
 
-        if "setup" in self.spec:
-            for i in self.spec["setup"]:
-                setup_varialbes = self._load_setup_varialbes(i)
-                global_cfg["variables"].update(setup_varialbes)
-
         # INTERNAL
         # NOTE - now that we can 'mark' tests, we could use pytest.mark.xfail
         # instead. This doesn't differentiate between an error in verification
@@ -630,6 +625,11 @@ class YamlItem(pytest.Item):
        
         try:
             verify_tests(self.spec)
+
+            if "setup" in self.spec:
+                for i in self.spec["setup"]:
+                    setup_varialbes = self._load_setup_varialbes(i)
+                    global_cfg["variables"].update(setup_varialbes)
 
             fixture_values = self._load_fixture_values()
             global_cfg["variables"].update(fixture_values)

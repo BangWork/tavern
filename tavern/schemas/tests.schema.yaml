@@ -396,6 +396,8 @@ schema;include_stage:
         description:
           required: false
           type: str
+        setup:
+          include: setup
         _xfail:
           include: xfail
         marks:
