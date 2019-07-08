@@ -25,16 +25,18 @@ class ComparatorManager(object):
         """
         if comparator in ["eq", "equals", "==", "is"]:
             return "equals"
-        if comparator in ["element_index"]:
-            return "element_index"
-        if comparator in ["equal_ignore_order"]:
-            return "equal_ignore_order"
-        if comparator in ["sorted_by_key"]:
-            return "sorted_by_key"
-        if comparator in ["element_equal", "element_eq"]:
-            return "element_equal"
-        if comparator in ["no_duplicate_elements"]:
-            return "no_duplicate_elements"
+        if comparator in ["element_equals_with_index"]:
+            return "element_equals_with_index"
+        if comparator in ["equals_ignore_order"]:
+            return "equals_ignore_order"
+        if comparator in ["list_equals_by_sorted_key"]:
+            return "list_equals_by_sorted_key"
+        if comparator in ["list_contains_with_items"]:
+            return "list_contains_with_items"
+        if comparator in ["list_not_contains_with_items"]:
+            return "list_not_contains_with_items"
+        if comparator in ["item_equals_in_list"]:
+            return "item_equals_in_list"
         if comparator in ["not_contains"]:
             return "not_contains"
         if comparator in ["contains"]:

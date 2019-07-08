@@ -63,7 +63,6 @@ def pytest_configure(config):
                 raise_from(exceptions.CallSetupFunctionError(
                     "Error Running setup function {}".format(setup_function)), e)
 
-
 def pytest_collect_file(parent, path):
     """On collecting files, get any files that end in .tavern.yaml or .tavern.yml as tavern
     test files
@@ -76,7 +75,6 @@ def pytest_collect_file(parent, path):
         return YamlFile(path, parent)
 
     return None
-
 
 def add_parser_options(parser_addoption, with_defaults=True):
     """Add argparse options
@@ -182,20 +180,6 @@ def pytest_addoption(parser):
         type="linelist",
         default=[]
     )
-
-# @pytest.mark.hookwrapper
-# def pytest_runtest_makereport(item):
-    # # ??? 什么鬼？
-    # outcome = yield
-    # report = outcome.get_result()
-    # # 没做插件怎么办？
-    # pytest_html = item.config.pluginmanager.getplugin('html')
-    # if pytest_html is not None:
-    #     extra = getattr(report, 'extra', [])
-    #     if report.when == 'call':
-    #         extra.append(pytest_html.extras.json(item.result, "summay"))
-    #         report.extra = extra
-
 
 class YamlFile(pytest.File):
 
@@ -370,6 +354,24 @@ class YamlFile(pytest.File):
                 verify_tests(test_spec, with_plugins=False)
                 raise
 
+class YamlItemContext():
+    def __init__(self):
+        self.context = {}
+
+    def get_context(self, path):
+        if path not in self.context:
+            return None
+
+        return self.context[path]
+
+    def update_context(self, path, context):
+        if path in self.context:
+            self.context[path].update(context)
+        else:
+            self.context[path] = context
+
+yaml_item_context = YamlItemContext()
+
 
 class YamlItem(pytest.Item):
 
@@ -389,7 +391,8 @@ class YamlItem(pytest.Item):
         self.path = path
         self.spec = spec
         self.global_cfg = self._initialize_variables()
-        self._resolve_variables(self.spec)
+        self._resolve_variables(self.spec, self.global_cfg)
+        self.exceptions = None
 
     def initialise_fixture_attrs(self):
         # pylint: disable=protected-access,attribute-defined-outside-init
@@ -458,22 +461,23 @@ class YamlItem(pytest.Item):
         global_cfg = self._parse_arguments()
         global_cfg.setdefault("variables", {})
         tavern_box = Box({
-            "env_vars": dict(os.environ),
+            "env_vars": dict(os.environ)
         })
         global_cfg["variables"]["tavern"] = tavern_box
+
         return global_cfg
 
-    def _resolve_variables(self, test_spec):
+    def _resolve_variables(self, test_spec, global_cfg):
 
         if "includes" in test_spec:
             for included in test_spec["includes"]:
-                self._resolve_variables(included)
+                self._resolve_variables(included, global_cfg)
 
         if "variables" in test_spec:
             formatted_include = format_keys(
-                test_spec["variables"], self.global_cfg["variables"])
-            self.global_cfg["variables"] = deep_dict_merge(
-                self.global_cfg["variables"], formatted_include)
+                test_spec["variables"], global_cfg["variables"])
+            global_cfg["variables"] = deep_dict_merge(
+                global_cfg["variables"], formatted_include)
 
     def _parse_arguments(self):
         # Load ini first
@@ -568,6 +572,45 @@ class YamlItem(pytest.Item):
 
         return values
 
+    def _run_setup(self, path):
+        base_dir = self.config.getoption("tavern_base_dir")
+        if base_dir is None:
+            base_dir = self.config.getini("tavern-base-dir")
+        rootdir = str(self.config.rootdir)
+        if base_dir is not None:
+            base_dir = os.path.join(rootdir, base_dir)
+        else:
+            base_dir = rootdir
+
+        path = os.path.join(base_dir, path[1:])
+        setup_file = YamlFile(path, self.parent.parent)
+        item = list(setup_file.collect())[0]
+        item.runtest()
+        setup_varialbes = item.global_cfg["variables"]
+
+        return setup_varialbes
+
+    def _load_setup_varialbes(self, setup):
+        setup_path = setup
+        # 需要重新执行setup
+        if isinstance(setup, dict):
+            setup_path = setup["path"]
+            if "saved" in setup and not setup["saved"]:
+                setup_varialbes = self._run_setup(setup_path)
+                return copy.deepcopy(setup_varialbes)
+
+        # 如果context有就用context
+        # isinstance(setup, str)
+        # isinstance(setup, dict) "saved" in setup and setup["saved"] == Ture
+        # isinstance(setup, dict) "saved" not in setup
+        setup_varialbes = yaml_item_context.get_context(setup_path)
+        # 如果存在context，直接用
+        if not setup_varialbes:
+            setup_varialbes = self._run_setup(setup_path)
+            yaml_item_context.update_context(setup_path, setup_varialbes)
+
+        return copy.deepcopy(setup_varialbes)
+
     def runtest(self):
         global_cfg = copy.deepcopy(self.global_cfg)
 
@@ -580,9 +623,14 @@ class YamlItem(pytest.Item):
         # instead. This doesn't differentiate between an error in verification
         # and an error when running the test though.
         xfail = self.spec.get("_xfail", False)
-
+       
         try:
             verify_tests(self.spec)
+
+            if "setup" in self.spec:
+                for i in self.spec["setup"]:
+                    setup_varialbes = self._load_setup_varialbes(i)
+                    global_cfg["variables"].update(setup_varialbes)
 
             fixture_values = self._load_fixture_values()
             global_cfg["variables"].update(fixture_values)
@@ -593,16 +641,18 @@ class YamlItem(pytest.Item):
                 logger.info("xfailing test while verifying schema")
             else:
                 raise
-        except exceptions.TavernException:
+        except exceptions.TavernException as e:
             if xfail == "run":
                 logger.info("xfailing test when running")
             else:
+                self.exceptions = e
                 raise
-        else:
+        else:            
             if xfail:
                 logger.error("Expected test to fail")
                 raise exceptions.TestFailError(
                     "Expected test to fail at {} stage".format(xfail))
+            self.global_cfg = global_cfg
 
     def repr_failure(self, excinfo):  # pylint: disable=no-self-use
         """ called when self.runtest() raises an exception.

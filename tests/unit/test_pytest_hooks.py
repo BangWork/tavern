@@ -156,3 +156,69 @@ class TestMakeFile(object):
         # [w, x, y, z, 1, 2]
         # etc.
         assert len(tests) == 36
+
+def get_yaml_item_test():
+    fspath = "abc"
+
+    cargs = {
+        "rootdir": "abc",
+        "fspath": fspath,
+    }
+
+    config = Mock(
+        **cargs
+    )
+    config.getini.return_value = ""
+    config.getoption.return_value = ""
+
+    parent = Mock(
+        config=config,
+        parent=None,
+        nodeid="sdlfs",
+        **cargs
+    )
+
+    spec = { "name": "test", "setup": ["path_to_setup"], "stages": [] }
+
+    return YamlItem("test", parent, spec, fspath)
+
+class TestSetup(object):
+    def test_setup_saved(self):
+        item = get_yaml_item_test()
+        item.global_cfg = {
+            "backends": {
+                "http": "requests",
+                "mqtt": "paho-mqtt"
+            },
+            "strict": ""
+        }
+
+        context = { "path_to_setup": { "some_key": "some_value" } }
+
+        with patch.object(item, "_run_setup") as pmock:
+            with patch.object(yaml_item_context, "context", context):
+                with patch.object(item, "_load_fixture_values"):
+                    with patch("tavern.core.run_test"):
+                        item.runtest()
+
+        assert pmock.called == False
+
+    def test_setup_not_saved(self):
+        item = get_yaml_item_test()
+        item.global_cfg = {
+            "backends": {
+                "http": "requests",
+                "mqtt": "paho-mqtt"
+            },
+            "strict": ""
+        }
+
+        context = {}
+
+        with patch.object(item, "_run_setup") as pmock:
+            with patch.object(yaml_item_context, "context", context):
+                with patch.object(item, "_load_fixture_values"):
+                    with patch("tavern.core.run_test"):
+                        item.runtest()
+
+        assert pmock.called == False

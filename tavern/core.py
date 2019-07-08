@@ -174,8 +174,12 @@ def run_stage(sessions, stage, test_block_config):
     response = r.run()
     verifiers = get_verifiers(stage, test_block_config, sessions, expected)
     for v in verifiers:
-        saved = v.verify(response)
-        test_block_config["variables"].update(saved)
+        try:
+            saved = v.verify(response)
+            test_block_config["variables"].update(saved)
+        except Exception as e:
+            e.response = response.text
+            raise
 
     test_block_config["variables"].pop("request")
     delay(stage, "after")
