@@ -635,7 +635,7 @@ class YamlItem(pytest.Item):
             fixture_values = self._load_fixture_values()
             global_cfg["variables"].update(fixture_values)
 
-            run_test(self.path, self.spec, global_cfg)
+            run_test(self.path, copy.deepcopy(self.spec), global_cfg)
         except exceptions.BadSchemaError:
             if xfail == "verify":
                 logger.info("xfailing test while verifying schema")
