@@ -24,7 +24,7 @@ def load_global_config(global_cfg_paths):
         logger.debug("Loading global config from %s", global_cfg_paths)
         for filename in global_cfg_paths:
             with open(filename, "r") as gfileobj:
-                contents = yaml.load(gfileobj)
+                contents = yaml.full_load(gfileobj)
 
             global_cfg = deep_dict_merge(global_cfg, contents)
 

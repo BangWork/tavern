@@ -30,7 +30,7 @@ class SchemaCache(object):
             return self._loaded[schema_filename]
         except KeyError:
             with open(schema_filename, "r") as sfile:
-                self._loaded[schema_filename] = yaml.load(sfile.read())
+                self._loaded[schema_filename] = yaml.full_load(sfile.read())
 
             logger.debug("Loaded schema from %s", schema_filename)
 
